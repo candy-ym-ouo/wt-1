@@ -114,6 +114,68 @@ export const useAudioStore = defineStore('audio', () => {
     setTimeout(() => playTone(150, 0.15, 'sawtooth', 0.3), 100)
   }
 
+  const playExpeditionStart = () => {
+    initAudioContext()
+    playTone(392, 0.1, 'triangle', 0.4)
+    setTimeout(() => playTone(523.25, 0.1, 'triangle', 0.4), 100)
+    setTimeout(() => playTone(659.25, 0.15, 'triangle', 0.4), 200)
+  }
+
+  const playEventFound = () => {
+    initAudioContext()
+    playTone(440, 0.08, 'sine', 0.3)
+    setTimeout(() => playTone(550, 0.08, 'sine', 0.3), 80)
+    setTimeout(() => playTone(660, 0.12, 'sine', 0.3), 160)
+  }
+
+  const playChoiceSuccess = () => {
+    initAudioContext()
+    const notes = [523.25, 659.25, 783.99]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.15, 'sine', 0.4), i * 100)
+    })
+  }
+
+  const playChoiceFailure = () => {
+    initAudioContext()
+    playTone(300, 0.15, 'triangle', 0.3)
+    setTimeout(() => playTone(250, 0.2, 'triangle', 0.3), 150)
+  }
+
+  const playReward = () => {
+    initAudioContext()
+    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.2, 'sine', 0.4), i * 120)
+    })
+    setTimeout(() => playTone(1567.98, 0.4, 'sine', 0.5), 600)
+  }
+
+  const playLevelUp = () => {
+    initAudioContext()
+    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.15, 'sine', 0.5), i * 80)
+    })
+    setTimeout(() => {
+      const notes2 = [2093.00, 1567.98, 2093.00, 2637.02]
+      notes2.forEach((note, i) => {
+        setTimeout(() => playTone(note, 0.2, 'sine', 0.5), i * 100)
+      })
+    }, 600)
+  }
+
+  const playStaminaLow = () => {
+    initAudioContext()
+    playTone(220, 0.1, 'square', 0.2)
+    setTimeout(() => playTone(220, 0.1, 'square', 0.2), 200)
+  }
+
+  const playExploreStep = () => {
+    initAudioContext()
+    playTone(330, 0.05, 'triangle', 0.2)
+  }
+
   const startBackgroundMusic = () => {
     if (!soundEnabled.value || !musicEnabled.value || !audioContext.value) return
     if (backgroundOscillator.value) return
@@ -232,6 +294,14 @@ export const useAudioStore = defineStore('audio', () => {
     playComplete,
     playRareFound,
     playError,
+    playExpeditionStart,
+    playEventFound,
+    playChoiceSuccess,
+    playChoiceFailure,
+    playReward,
+    playLevelUp,
+    playStaminaLow,
+    playExploreStep,
     startBackgroundMusic,
     stopBackgroundMusic,
     toggleSound,

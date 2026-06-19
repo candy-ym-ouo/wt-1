@@ -7,6 +7,11 @@ const routes = [
     component: () => import('@/views/ShowcaseView.vue')
   },
   {
+    path: '/expedition',
+    name: 'Expedition',
+    component: () => import('@/views/ExpeditionView.vue')
+  },
+  {
     path: '/collage',
     name: 'Collage',
     component: () => import('@/views/CollageView.vue')

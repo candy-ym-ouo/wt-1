@@ -55,6 +55,7 @@ const audioStore = useAudioStore()
 
 const navItems = [
   { path: '/', icon: '🏠', label: '展柜' },
+  { path: '/expedition', icon: '🗺️', label: '远征' },
   { path: '/collage', icon: '🎨', label: '拼装' },
   { path: '/collection', icon: '📖', label: '图鉴' }
 ]

@@ -22,9 +22,13 @@
           <span class="logo-text">矿物博物馆</span>
         </div>
         <div class="header-stats">
-          <div class="stat-item">
+          <div class="stat-item" @click="goToTasks">
             <span class="stat-icon">📦</span>
             <span class="stat-value">{{ collectedCount }}/{{ totalCount }}</span>
+          </div>
+          <div class="stat-item coin-stat" @click="openCoinFlow">
+            <span class="stat-icon">🪙</span>
+            <span class="stat-value">{{ formatNumber(gameStore.coins) }}</span>
           </div>
           <div v-if="taskClaimableCount > 0" class="stat-item task-claimable" @click="goToTasks">
             <span class="stat-icon">🎁</span>
@@ -69,6 +73,11 @@
       :result="seasonStore.settlementResult"
       @close="seasonStore.closeSettlementModal"
     />
+    
+    <CoinFlowModal 
+      :visible="showCoinFlow" 
+      @close="closeCoinFlow" 
+    />
 
     <Teleport to="body">
       <Transition name="modal">
@@ -111,6 +120,7 @@ import { useDetectorStore } from './stores/detector'
 import { useResearchStore } from './stores/research'
 import { useAuctionStore } from './stores/auction'
 import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
+import CoinFlowModal from './components/CoinFlowModal.vue'
 import { useRouter } from 'vue-router'
 import { MINERALS } from './data/minerals'
 import { SEASONS } from './data/season'
@@ -128,6 +138,17 @@ const seasonStore = useSeasonStore()
 const detectorStore = useDetectorStore()
 const researchStore = useResearchStore()
 const auctionStore = useAuctionStore()
+
+const showCoinFlow = ref(false)
+
+const openCoinFlow = () => {
+  audioStore.playClick()
+  showCoinFlow.value = true
+}
+
+const closeCoinFlow = () => {
+  showCoinFlow.value = false
+}
 
 const navItems = [
   { path: '/', icon: '🏛️', label: '博物馆' },
@@ -161,6 +182,12 @@ const totalCount = computed(() => totalMineralsCount.value)
 const soundEnabled = computed(() => audioStore.soundEnabled)
 const taskClaimableCount = computed(() => taskStore.claimableCount)
 const seasonClaimableCount = computed(() => seasonStore.totalClaimableCount)
+
+const formatNumber = (num) => {
+  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
+  return num.toString()
+}
 
 const toggleSound = () => {
   audioStore.toggleSound()
@@ -406,6 +433,27 @@ onUnmounted(() => {
   padding: 6px 12px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.coin-stat {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.1));
+  border-color: rgba(245, 158, 11, 0.3);
+  font-weight: 700;
+}
+
+.coin-stat:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(251, 191, 36, 0.2));
+}
+
+.coin-stat .stat-value {
+  color: #fbbf24;
 }
 
 .stat-icon {

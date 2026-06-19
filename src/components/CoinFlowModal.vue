@@ -4,7 +4,7 @@
       <div class="modal-header">
         <h2 class="modal-title">
           <span class="title-icon">💰</span>
-          金币流水
+          {{ mineralId ? '矿物金币明细' : (defaultTypes?.length > 0 && activeCategory === 'default' ? '任务奖励记录' : '金币流水') }}
         </h2>
         <button class="close-btn" @click="close">
           ✕
@@ -41,7 +41,7 @@
         <div class="filter-tabs">
           <button 
             class="filter-tab" 
-          :class="{ active: activeFilter === 'all' }"
+            :class="{ active: activeFilter === 'all' }"
             @click="activeFilter = 'all'"
           >
             全部
@@ -60,6 +60,35 @@
           >
             支出
           </button>
+        </div>
+
+        <div class="category-filter" v-if="!mineralId">
+          <div class="filter-scroll">
+            <button 
+              class="cat-filter-btn" 
+              :class="{ active: activeCategory === 'all' }"
+              @click="activeCategory = 'all'"
+            >
+              全部类型
+            </button>
+            <button 
+              v-if="defaultTypes && defaultTypes.length > 0"
+              class="cat-filter-btn" 
+              :class="{ active: activeCategory === 'default' }"
+              @click="activeCategory = 'default'"
+            >
+              📋 任务奖励
+            </button>
+            <button 
+              v-for="cat in availableCategories" 
+              :key="cat.key"
+              class="cat-filter-btn" 
+              :class="{ active: activeCategory === cat.key }"
+              @click="activeCategory = cat.key"
+            >
+              {{ cat.icon }} {{ cat.name }}
+            </button>
+          </div>
         </div>
 
         <div class="category-breakdown" v-if="stats.categoryStats.length > 0">
@@ -93,15 +122,22 @@
               v-for="tx in filteredTransactions" 
               :key="tx.id"
               class="transaction-item"
+              :class="{ clickable: tx.extraData?.mineralId }"
+              @click="tx.extraData?.mineralId && goToMineral(tx.extraData.mineralId)"
             >
               <div class="tx-left">
                 <span class="tx-icon" :style="{ background: tx.categoryColor + '20' }">
-                  {{ tx.categoryIcon }}
+                  {{ tx.extraData?.mineralEmoji || tx.categoryIcon }}
                 </span>
                 <div class="tx-info">
                   <span class="tx-category">{{ tx.categoryName }}</span>
                   <span class="tx-desc">{{ tx.description }}</span>
-                  <span class="tx-time">{{ formatTime(tx.timestamp) }}</span>
+                  <span class="tx-time">
+                    {{ formatTime(tx.timestamp) }}
+                    <span v-if="tx.extraData?.mineralId" class="tx-mineral-tag">
+                      📍 点击查看矿物
+                    </span>
+                  </span>
                 </div>
               </div>
               <div class="tx-right">
@@ -124,8 +160,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useGameStore } from '@/stores/game'
+import { useRouter } from 'vue-router'
 
 const props = defineProps({
   visible: {
@@ -135,28 +172,73 @@ const props = defineProps({
   mineralId: {
     type: [Number, String],
     default: null
+  },
+  defaultTypes: {
+    type: Array,
+    default: () => []
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'viewMineral'])
 
+const router = useRouter()
 const gameStore = useGameStore()
 const activeFilter = ref('all')
+const activeCategory = ref('all')
+
+watch(() => props.visible, (newVal) => {
+  if (newVal) {
+    if (props.defaultTypes && props.defaultTypes.length > 0) {
+      activeCategory.value = 'default'
+    } else {
+      activeCategory.value = 'all'
+    }
+  }
+})
+
+watch(() => props.defaultTypes, (newVal) => {
+  if (newVal && newVal.length > 0) {
+    activeCategory.value = 'default'
+  }
+})
+
+const availableCategories = computed(() => {
+  const categories = new Set()
+  gameStore.coinTransactions.forEach(t => categories.add(t.category))
+  return Array.from(categories).map(cat => {
+    const config = gameStore.getCoinCategoryConfig(cat)
+    return {
+      key: cat,
+      name: config.name,
+      icon: config.icon,
+      type: config.type
+    }
+  })
+})
+
+const currentCategories = computed(() => {
+  if (activeCategory.value === 'all') return null
+  if (activeCategory.value === 'default' && props.defaultTypes?.length > 0) {
+    return props.defaultTypes
+  }
+  if (activeCategory.value !== 'all' && activeCategory.value !== 'default') {
+    return [activeCategory.value]
+  }
+  return null
+})
 
 const stats = computed(() => {
   if (props.mineralId) {
     return gameStore.getMineralCoinStats(props.mineralId)
   }
-  return gameStore.getCoinStats()
+  return gameStore.getCoinStats({ categories: currentCategories.value })
 })
 
 const filteredTransactions = computed(() => {
-  let transactions
-  if (props.mineralId) {
-    transactions = gameStore.getCoinTransactions({ mineralId: props.mineralId })
-  } else {
-    transactions = gameStore.coinTransactions
-  }
+  let transactions = gameStore.getCoinTransactions({ 
+    mineralId: props.mineralId || undefined,
+    categories: currentCategories.value
+  })
   
   if (activeFilter.value === 'all') {
     return transactions
@@ -164,6 +246,13 @@ const filteredTransactions = computed(() => {
   
   return transactions.filter(t => t.type === activeFilter.value)
 })
+
+const goToMineral = (mineralId) => {
+  if (!mineralId) return
+  emit('viewMineral', mineralId)
+  router.push(`/mineral/${mineralId}`)
+  close()
+}
 
 const formatNumber = (num) => {
   if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
@@ -331,7 +420,7 @@ const close = () => {
 .filter-tabs {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   background: rgba(255, 255, 255, 0.03);
   padding: 4px;
   border-radius: 10px;
@@ -357,6 +446,47 @@ const close = () => {
 .filter-tab.active {
   background: var(--primary);
   color: white;
+}
+
+.category-filter {
+  margin-bottom: 16px;
+}
+
+.filter-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-filter-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.cat-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.cat-filter-btn.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.15));
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #a78bfa;
 }
 
 .section-title {
@@ -451,6 +581,17 @@ const close = () => {
   background: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.transaction-item.clickable {
+  cursor: pointer;
+}
+
+.transaction-item.clickable:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateX(2px);
 }
 
 .tx-left {
@@ -497,6 +638,18 @@ const close = () => {
   font-size: 11px;
   color: var(--text-secondary);
   opacity: 0.7;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tx-mineral-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border-radius: 6px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
 .tx-right {

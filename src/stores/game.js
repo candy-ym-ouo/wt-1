@@ -230,6 +230,7 @@ export const useGameStore = defineStore('game', () => {
   const getCoinTransactions = ({ 
     type = null, 
     category = null, 
+    categories = null,
     mineralId = null,
     limit = null,
     startDate = null,
@@ -242,6 +243,9 @@ export const useGameStore = defineStore('game', () => {
     }
     if (category) {
       transactions = transactions.filter(t => t.category === category)
+    }
+    if (categories && categories.length > 0) {
+      transactions = transactions.filter(t => categories.includes(t.category))
     }
     if (mineralId) {
       transactions = transactions.filter(t => t.extraData?.mineralId === mineralId)
@@ -259,8 +263,8 @@ export const useGameStore = defineStore('game', () => {
     return transactions
   }
 
-  const getCoinStats = ({ startDate = null, endDate = null } = {}) => {
-    const transactions = getCoinTransactions({ startDate, endDate })
+  const getCoinStats = ({ startDate = null, endDate = null, categories = null } = {}) => {
+    const transactions = getCoinTransactions({ startDate, endDate, categories })
     
     let totalIncome = 0
     let totalExpense = 0

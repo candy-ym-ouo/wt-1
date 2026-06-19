@@ -1,8 +1,17 @@
 <template>
   <div class="task-view">
     <div class="task-header">
-      <h1 class="page-title">⛏️ 任务中心</h1>
-      <p class="page-subtitle">完成矿物主题任务，赢取丰厚奖励</p>
+      <div class="header-top">
+        <div class="header-title-group">
+          <h1 class="page-title">⛏️ 任务中心</h1>
+          <p class="page-subtitle">完成矿物主题任务，赢取丰厚奖励</p>
+        </div>
+        <button class="coin-flow-btn" @click="openCoinFlow">
+          <span class="btn-icon">💰</span>
+          <span class="btn-text">收支记录</span>
+          <span class="btn-amount">+{{ formatNumber(taskCoinStats.totalIncome) }}</span>
+        </button>
+      </div>
       <div v-if="claimableCount > 0" class="claimable-badge" @click="handleClaimAll">
         <span class="badge-pulse"></span>
         <span class="badge-text">{{ claimableCount }} 个奖励可领取</span>
@@ -225,6 +234,15 @@
         <button class="popup-close-btn" @click="taskStore.claimAnimation = null">太棒了！</button>
       </div>
     </div>
+    
+    <CoinFlowModal 
+      :visible="showCoinFlow" 
+      :default-types="[
+        'task_reward',
+        'achievement_reward'
+      ]"
+      @close="closeCoinFlow" 
+    />
   </div>
 </template>
 
@@ -232,9 +250,31 @@
 import { ref, computed } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { useAudioStore } from '@/stores/audio'
+import { useGameStore } from '@/stores/game'
+import CoinFlowModal from '@/components/CoinFlowModal.vue'
 
 const taskStore = useTaskStore()
 const audioStore = useAudioStore()
+const gameStore = useGameStore()
+
+const showCoinFlow = ref(false)
+
+const openCoinFlow = () => {
+  audioStore.playClick()
+  showCoinFlow.value = true
+}
+
+const closeCoinFlow = () => {
+  showCoinFlow.value = false
+}
+
+const taskCoinStats = computed(() => {
+  const categories = [
+    'task_reward',
+    'achievement_reward'
+  ]
+  return gameStore.getCoinStats({ categories })
+})
 
 const activeTab = ref('daily')
 
@@ -301,6 +341,12 @@ const handleClaimAll = () => {
     audioStore.playRareFound()
   }
 }
+
+const formatNumber = (num) => {
+  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
+  return num.toString()
+}
 </script>
 
 <style scoped>
@@ -315,6 +361,55 @@ const handleClaimAll = () => {
   margin-bottom: 20px;
 }
 
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.header-title-group {
+  flex: 1;
+}
+
+.coin-flow-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.1));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.coin-flow-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(251, 191, 36, 0.2));
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+
+.coin-flow-btn .btn-icon {
+  font-size: 18px;
+}
+
+.coin-flow-btn .btn-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.coin-flow-btn .btn-amount {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c55e;
+  font-family: 'Courier New', monospace;
+}
+
 .page-title {
   font-size: 28px;
   font-weight: 700;
@@ -325,7 +420,7 @@ const handleClaimAll = () => {
 .page-subtitle {
   font-size: 14px;
   color: var(--text-secondary);
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .claimable-badge {

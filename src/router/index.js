@@ -47,6 +47,11 @@ const routes = [
     component: () => import('@/views/QuizView.vue')
   },
   {
+    path: '/exchange',
+    name: 'Exchange',
+    component: () => import('@/views/ExchangeView.vue')
+  },
+  {
     path: '/mineral/:id',
     name: 'MineralDetail',
     component: () => import('@/views/MineralDetailView.vue')

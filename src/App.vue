@@ -63,6 +63,7 @@ import { useTaskStore } from './stores/task'
 import { useGachaStore } from './stores/gacha'
 import { useMuseumStore } from './stores/museum'
 import { useQuizStore } from './stores/quiz'
+import { useExchangeStore } from './stores/exchange'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -73,6 +74,7 @@ const taskStore = useTaskStore()
 const gachaStore = useGachaStore()
 const museumStore = useMuseumStore()
 const quizStore = useQuizStore()
+const exchangeStore = useExchangeStore()
 
 const navItems = [
   { path: '/', icon: '🏛️', label: '博物馆' },
@@ -83,6 +85,7 @@ const navItems = [
   { path: '/collection', icon: '📖', label: '图鉴' },
   { path: '/gacha', icon: '🎁', label: '盲盒' },
   { path: '/market', icon: '🏪', label: '市场' },
+  { path: '/exchange', icon: '🔄', label: '交换' },
   { path: '/task', icon: '⛏️', label: '任务' }
 ]
 
@@ -109,6 +112,7 @@ onMounted(() => {
   gachaStore.loadProgress()
   museumStore.loadData()
   quizStore.loadProgress()
+  exchangeStore.loadExchangeData()
 
   gameStore.onTaskEvent = (eventName, payload) => {
     switch (eventName) {

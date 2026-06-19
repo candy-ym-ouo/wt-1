@@ -236,6 +236,14 @@
             上架拍卖
           </button>
         </div>
+        <button
+          v-if="mineralCount > 1"
+          class="btn btn-large exchange-entry-btn"
+          @click="goToExchange"
+        >
+          <span class="btn-icon">🔄</span>
+          前往交换站置换
+        </button>
       </div>
     </div>
 
@@ -410,6 +418,11 @@ const mineralCount = computed(() => {
 const goToMarket = () => {
   audioStore.playClick()
   router.push('/market')
+}
+
+const goToExchange = () => {
+  audioStore.playClick()
+  router.push('/exchange')
 }
 
 const listMineral = () => {
@@ -761,6 +774,12 @@ onMounted(() => {
 
 .action-row .btn {
   flex: 1;
+}
+
+.exchange-entry-btn {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
 }
 
 .locked-content,

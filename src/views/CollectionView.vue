@@ -52,13 +52,20 @@
         <span class="btn-icon">🏪</span>
         前往市场
       </button>
-      <button 
-        class="btn btn-secondary btn-small" 
+      <button
+        class="btn btn-secondary btn-small"
         @click="openListModal"
         :disabled="gameStore.collectedMinerals.length === 0"
       >
         <span class="btn-icon">📤</span>
         上架矿物
+      </button>
+      <button
+        class="btn btn-small exchange-entry-btn"
+        @click="goToExchange"
+      >
+        <span class="btn-icon">🔄</span>
+        交换站
       </button>
     </div>
 
@@ -203,6 +210,11 @@ const getMineralCount = (id) => {
 const goToMarket = () => {
   audioStore.playClick()
   router.push('/market')
+}
+
+const goToExchange = () => {
+  audioStore.playClick()
+  router.push('/exchange')
 }
 
 const openListModal = () => {
@@ -554,6 +566,15 @@ const listMineral = (mineral) => {
 
 .action-bar .btn {
   flex: 1;
+}
+
+.exchange-entry-btn {
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+}
+
+.exchange-entry-btn:hover {
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
 }
 
 .btn-icon {

@@ -27,6 +27,11 @@ const routes = [
     component: () => import('@/views/MarketView.vue')
   },
   {
+    path: '/gacha',
+    name: 'GachaWorkshop',
+    component: () => import('@/views/GachaWorkshopView.vue')
+  },
+  {
     path: '/task',
     name: 'TaskCenter',
     component: () => import('@/views/TaskCenterView.vue')

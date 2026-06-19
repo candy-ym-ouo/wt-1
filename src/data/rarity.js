@@ -15,7 +15,9 @@ export const RARITY_CONFIG = {
     probability: 0.45,
     glowIntensity: 0,
     starCount: 1,
-    pieceCount: 4
+    pieceCount: 4,
+    basePrice: 50,
+    priceMultiplier: 1
   },
   [RARITY.UNCOMMON]: {
     name: '稀有',
@@ -25,7 +27,9 @@ export const RARITY_CONFIG = {
     probability: 0.30,
     glowIntensity: 1,
     starCount: 2,
-    pieceCount: 6
+    pieceCount: 6,
+    basePrice: 150,
+    priceMultiplier: 2
   },
   [RARITY.RARE]: {
     name: '珍稀',
@@ -35,7 +39,9 @@ export const RARITY_CONFIG = {
     probability: 0.15,
     glowIntensity: 2,
     starCount: 3,
-    pieceCount: 8
+    pieceCount: 8,
+    basePrice: 400,
+    priceMultiplier: 4
   },
   [RARITY.EPIC]: {
     name: '史诗',
@@ -45,7 +51,9 @@ export const RARITY_CONFIG = {
     probability: 0.07,
     glowIntensity: 3,
     starCount: 4,
-    pieceCount: 10
+    pieceCount: 10,
+    basePrice: 1200,
+    priceMultiplier: 8
   },
   [RARITY.LEGENDARY]: {
     name: '传说',
@@ -55,7 +63,9 @@ export const RARITY_CONFIG = {
     probability: 0.03,
     glowIntensity: 4,
     starCount: 5,
-    pieceCount: 12
+    pieceCount: 12,
+    basePrice: 5000,
+    priceMultiplier: 20
   }
 }
 

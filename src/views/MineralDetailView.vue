@@ -98,11 +98,58 @@
         </div>
       </div>
 
+      <div class="market-info card">
+        <h2 class="section-title">
+          <span class="title-icon">📊</span>
+          市场行情
+        </h2>
+        <div class="market-stats">
+          <div class="market-stat">
+            <span class="stat-label">基准价格</span>
+            <span class="stat-value">{{ basePrice }}</span>
+          </div>
+          <div class="market-stat">
+            <span class="stat-label">当前市价</span>
+            <span class="stat-value price">{{ marketPrice }}</span>
+          </div>
+          <div class="market-stat">
+            <span class="stat-label">价格趋势</span>
+            <span class="stat-value" :class="priceTrend.trend">
+              <span v-if="priceTrend.trend === 'up'">📈</span>
+              <span v-else-if="priceTrend.trend === 'down'">📉</span>
+              <span v-else>➡️</span>
+              {{ priceTrend.change }}%
+            </span>
+          </div>
+          <div class="market-stat">
+            <span class="stat-label">持有数量</span>
+            <span class="stat-value">{{ mineralCount }}</span>
+          </div>
+        </div>
+      </div>
+
       <div class="action-section">
         <button class="btn btn-large" @click="collectAgain">
           <span class="btn-icon">🎨</span>
           再次拼装获得金币
         </button>
+        <div class="action-row">
+          <button 
+            class="btn btn-large btn-secondary" 
+            @click="goToMarket"
+          >
+            <span class="btn-icon">🏪</span>
+            查看市场
+          </button>
+          <button 
+            class="btn btn-large" 
+            @click="listMineral"
+            :disabled="mineralCount < 1"
+          >
+            <span class="btn-icon">📤</span>
+            上架拍卖
+          </button>
+        </div>
       </div>
     </div>
 
@@ -127,6 +174,7 @@ import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
+import { useMarketStore } from '@/stores/market'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 import { getMineralById } from '@/data/minerals'
 
@@ -134,6 +182,7 @@ const route = useRoute()
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
+const marketStore = useMarketStore()
 
 const mineral = computed(() => {
   const id = parseInt(route.params.id)
@@ -191,6 +240,41 @@ const collectAgain = () => {
       router.push('/collage')
     }
   }
+}
+
+const basePrice = computed(() => {
+  if (!mineral.value) return 0
+  return marketStore.getBasePrice(mineral.value)
+})
+
+const marketPrice = computed(() => {
+  if (!mineral.value) return 0
+  return marketStore.getMarketPrice(mineral.value.id)
+})
+
+const priceTrend = computed(() => {
+  if (!mineral.value) return { trend: 'stable', change: 0 }
+  return marketStore.getPriceTrend(mineral.value.id)
+})
+
+const mineralCount = computed(() => {
+  if (!mineral.value) return 0
+  const m = gameStore.collectedMinerals.find(m => m.id === mineral.value.id)
+  return m?.count || 0
+})
+
+const goToMarket = () => {
+  audioStore.playClick()
+  router.push('/market')
+}
+
+const listMineral = () => {
+  if (!mineral.value || mineralCount.value < 1) return
+  audioStore.playClick()
+  router.push('/market')
+  setTimeout(() => {
+    marketStore.openListModal(mineral.value)
+  }, 100)
 }
 
 onMounted(() => {
@@ -477,6 +561,60 @@ onMounted(() => {
 
 .btn-icon {
   margin-right: 8px;
+}
+
+.market-info {
+  margin: 0 16px 16px 16px;
+  padding: 20px;
+}
+
+.market-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.market-stat {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.market-stat .stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.market-stat .stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.market-stat .stat-value.price {
+  color: #fbbf24;
+}
+
+.market-stat .stat-value.up {
+  color: #22c55e;
+}
+
+.market-stat .stat-value.down {
+  color: #ef4444;
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.action-row .btn {
+  flex: 1;
 }
 
 .locked-content,

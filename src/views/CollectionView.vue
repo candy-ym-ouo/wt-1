@@ -47,6 +47,21 @@
       </div>
     </div>
 
+    <div class="action-bar">
+      <button class="btn btn-small" @click="goToMarket">
+        <span class="btn-icon">🏪</span>
+        前往市场
+      </button>
+      <button 
+        class="btn btn-secondary btn-small" 
+        @click="openListModal"
+        :disabled="gameStore.collectedMinerals.length === 0"
+      >
+        <span class="btn-icon">📤</span>
+        上架矿物
+      </button>
+    </div>
+
     <div class="rarity-legend">
       <div 
         v-for="(config, rarity) in RARITY_CONFIG" 
@@ -98,9 +113,19 @@
             <div class="item-meta" v-if="isMineralCollected(mineral.id)">
               <span class="meta-item">化学式: {{ mineral.formula }}</span>
               <span class="meta-item">硬度: {{ mineral.hardness }}</span>
+              <span class="meta-item">数量: {{ getMineralCount(mineral.id) }}</span>
             </div>
           </div>
-          <span class="item-arrow">›</span>
+          <div class="item-actions" v-if="isMineralCollected(mineral.id)" @click.stop>
+            <button 
+              class="btn btn-small list-btn" 
+              @click="listMineral(mineral)"
+              :disabled="getMineralCount(mineral.id) < 1"
+            >
+              📤 上架
+            </button>
+          </div>
+          <span class="item-arrow" v-else>›</span>
         </div>
       </div>
     </div>
@@ -113,12 +138,14 @@ import { useRouter } from 'vue-router'
 import MineralCard from '@/components/MineralCard.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
+import { useMarketStore } from '@/stores/market'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { MINERALS } from '@/data/minerals'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
+const marketStore = useMarketStore()
 
 const activeFilter = ref('all')
 const viewMode = ref('grid')
@@ -166,6 +193,32 @@ const viewMineralDetail = (mineral) => {
   }
   audioStore.playClick()
   router.push(`/mineral/${mineral.id}`)
+}
+
+const getMineralCount = (id) => {
+  const m = gameStore.collectedMinerals.find(m => m.id === id)
+  return m?.count || 0
+}
+
+const goToMarket = () => {
+  audioStore.playClick()
+  router.push('/market')
+}
+
+const openListModal = () => {
+  audioStore.playClick()
+  router.push('/market')
+  setTimeout(() => {
+    marketStore.openListModal()
+  }, 100)
+}
+
+const listMineral = (mineral) => {
+  audioStore.playClick()
+  router.push('/market')
+  setTimeout(() => {
+    marketStore.openListModal(mineral)
+  }, 100)
 }
 </script>
 
@@ -480,6 +533,31 @@ const viewMineralDetail = (mineral) => {
   font-size: 24px;
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.item-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.list-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.action-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.action-bar .btn {
+  flex: 1;
+}
+
+.btn-icon {
+  margin-right: 6px;
 }
 
 @media (min-width: 600px) {

@@ -42,22 +42,29 @@
         <span class="nav-label">{{ item.label }}</span>
       </RouterLink>
     </nav>
+
+    <div v-if="marketStore.showListModal || marketStore.showBidModal">
+      <RouterView name="marketModals" />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from './stores/game'
 import { useAudioStore } from './stores/audio'
+import { useMarketStore } from './stores/market'
 
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
+const marketStore = useMarketStore()
 
 const navItems = [
   { path: '/', icon: '🏠', label: '展柜' },
   { path: '/expedition', icon: '🗺️', label: '远征' },
   { path: '/collage', icon: '🎨', label: '拼装' },
-  { path: '/collection', icon: '📖', label: '图鉴' }
+  { path: '/collection', icon: '📖', label: '图鉴' },
+  { path: '/market', icon: '🏪', label: '市场' }
 ]
 
 const collectedCount = computed(() => gameStore.collectedMinerals.length)
@@ -68,9 +75,23 @@ const toggleSound = () => {
   audioStore.toggleSound()
 }
 
+const marketUpdateTimer = ref(null)
+
 onMounted(() => {
   audioStore.loadAudioSettings()
   gameStore.loadProgress()
+  marketStore.loadMarketData()
+  
+  marketUpdateTimer.value = setInterval(() => {
+    marketStore.checkAllAuctions()
+    marketStore.simulateNPCBids()
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (marketUpdateTimer.value) {
+    clearInterval(marketUpdateTimer.value)
+  }
 })
 </script>
 

@@ -22,6 +22,11 @@ const routes = [
     component: () => import('@/views/CollectionView.vue')
   },
   {
+    path: '/market',
+    name: 'Market',
+    component: () => import('@/views/MarketView.vue')
+  },
+  {
     path: '/mineral/:id',
     name: 'MineralDetail',
     component: () => import('@/views/MineralDetailView.vue')

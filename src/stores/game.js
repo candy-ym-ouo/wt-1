@@ -39,6 +39,14 @@ export const useGameStore = defineStore('game', () => {
   const expeditionHistory = ref([])
   const staminaRecoveryTimer = ref(null)
 
+  const onTaskEvent = ref(null)
+
+  const emitTaskEvent = (eventName, payload) => {
+    if (onTaskEvent.value) {
+      onTaskEvent.value(eventName, payload)
+    }
+  }
+
   const allMinerals = computed(() => MINERALS)
 
   const collectionProgress = computed(() => {
@@ -79,12 +87,15 @@ export const useGameStore = defineStore('game', () => {
         collectedAt: Date.now(),
         count: 1
       })
+      emitTaskEvent('mineralCollected', mineral)
       saveProgress()
       return true
     } else {
       const existing = collectedMinerals.value.find(m => m.id === mineral.id)
       existing.count++
       coins.value += 10
+      emitTaskEvent('mineralCollected', mineral)
+      emitTaskEvent('coinsEarned', 10)
       saveProgress()
       return false
     }
@@ -175,6 +186,7 @@ export const useGameStore = defineStore('game', () => {
     if (allPlaced && currentCollage.value) {
       const isNew = collectMineral(currentCollage.value)
       coins.value += RARITY_CONFIG[currentCollage.value.rarity].starCount * 20
+      emitTaskEvent('coinsEarned', RARITY_CONFIG[currentCollage.value.rarity].starCount * 20)
 
       completedCollages.value.push({
         mineral: currentCollage.value,
@@ -185,6 +197,8 @@ export const useGameStore = defineStore('game', () => {
       newMineral.value = currentCollage.value
       isNewMineral.value = isNew
       showNewMineralModal.value = true
+
+      emitTaskEvent('collageComplete')
 
       saveProgress()
       return true
@@ -308,6 +322,7 @@ export const useGameStore = defineStore('game', () => {
   const spendStamina = (amount) => {
     if (stamina.value >= amount) {
       stamina.value -= amount
+      emitTaskEvent('staminaSpent', amount)
       saveProgress()
       return true
     }
@@ -444,6 +459,8 @@ export const useGameStore = defineStore('game', () => {
     const expGain = expedition.difficulty * 20 + Math.floor(finalCoins / 10)
     addExp(expGain)
 
+    emitTaskEvent('expeditionComplete', finalCoins)
+
     const historyRecord = {
       id: Date.now(),
       location: expedition.name,
@@ -542,6 +559,8 @@ export const useGameStore = defineStore('game', () => {
     continueExpedition,
     closeRewardModal,
     cancelExpedition,
-    getLocation
+    getLocation,
+    onTaskEvent,
+    emitTaskEvent
   }
 })

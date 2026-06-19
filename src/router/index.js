@@ -27,6 +27,11 @@ const routes = [
     component: () => import('@/views/MarketView.vue')
   },
   {
+    path: '/task',
+    name: 'TaskCenter',
+    component: () => import('@/views/TaskCenterView.vue')
+  },
+  {
     path: '/mineral/:id',
     name: 'MineralDetail',
     component: () => import('@/views/MineralDetailView.vue')

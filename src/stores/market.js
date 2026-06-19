@@ -207,7 +207,9 @@ export const useMarketStore = defineStore('market', () => {
       }
       
       if (listing.sellerId === 'player') {
-        gameStore.coins += Math.round(winningBid.amount * 0.95)
+        const sellerEarnings = Math.round(winningBid.amount * 0.95)
+        gameStore.coins += sellerEarnings
+        gameStore.emitTaskEvent('marketTransaction', sellerEarnings)
       }
       
       recordTransaction(listing, winningBid)

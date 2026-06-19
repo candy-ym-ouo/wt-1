@@ -34,6 +34,34 @@
       </div>
     </div>
 
+    <div class="task-overview" @click="goToTasks">
+      <div class="task-overview-header">
+        <h3 class="overview-title">⛏️ 任务中心</h3>
+        <span v-if="taskClaimableCount > 0" class="overview-badge">{{ taskClaimableCount }} 个奖励可领</span>
+        <span v-else class="overview-arrow">→</span>
+      </div>
+      <div class="task-overview-body">
+        <div class="overview-item">
+          <span class="overview-item-label">📋 每日</span>
+          <div class="overview-progress-bar">
+            <div class="overview-progress-fill daily" :style="{ width: dailyCompletionRate + '%' }"></div>
+          </div>
+          <span class="overview-percent">{{ dailyCompletionRate }}%</span>
+        </div>
+        <div class="overview-item">
+          <span class="overview-item-label">🎯 周目标</span>
+          <div class="overview-progress-bar">
+            <div class="overview-progress-fill weekly" :style="{ width: weeklyCompletionRate + '%' }"></div>
+          </div>
+          <span class="overview-percent">{{ weeklyCompletionRate }}%</span>
+        </div>
+        <div class="overview-item">
+          <span class="overview-item-label">🏅 徽章</span>
+          <span class="overview-badge-count">{{ achievementStats.claimed }}/{{ achievementStats.total }}</span>
+        </div>
+      </div>
+    </div>
+
     <div class="action-section">
       <button class="btn btn-large" @click="startNewCollage">
         <span class="btn-icon">✨</span>
@@ -113,15 +141,21 @@ import { useRouter } from 'vue-router'
 import MineralCard from '@/components/MineralCard.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
+import { useTaskStore } from '@/stores/task'
 import { RARITY_CONFIG } from '@/data/rarity'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
+const taskStore = useTaskStore()
 
 const showResetConfirm = ref(false)
 
 const progress = computed(() => gameStore.collectionProgress)
+const taskClaimableCount = computed(() => taskStore.claimableCount)
+const dailyCompletionRate = computed(() => taskStore.dailyCompletionRate)
+const weeklyCompletionRate = computed(() => taskStore.weeklyCompletionRate)
+const achievementStats = computed(() => taskStore.totalAchievementCount)
 
 const collectedMinerals = computed(() => {
   return [...gameStore.collectedMinerals].sort((a, b) => {
@@ -151,6 +185,11 @@ const startNewCollage = () => {
   audioStore.playClick()
   audioStore.initAudioContext()
   router.push('/collage')
+}
+
+const goToTasks = () => {
+  audioStore.playClick()
+  router.push('/task')
 }
 
 const viewMineralDetail = (mineral) => {
@@ -238,6 +277,110 @@ const confirmReset = () => {
 
 .action-section {
   margin-bottom: 24px;
+}
+
+.task-overview {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.task-overview:hover {
+  border-color: rgba(233, 69, 96, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.task-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.overview-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.overview-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), #ff6b6b);
+  padding: 4px 12px;
+  border-radius: 10px;
+  animation: claimPulse 2s ease-in-out infinite;
+}
+
+@keyframes claimPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0); }
+  50% { box-shadow: 0 0 10px 2px rgba(233, 69, 96, 0.3); }
+}
+
+.overview-arrow {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.task-overview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overview-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overview-item-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 56px;
+}
+
+.overview-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.overview-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.overview-progress-fill.daily {
+  background: linear-gradient(90deg, var(--primary), #ff6b6b);
+}
+
+.overview-progress-fill.weekly {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.overview-percent {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 32px;
+  text-align: right;
+}
+
+.overview-badge-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f59e0b;
 }
 
 .btn-large {

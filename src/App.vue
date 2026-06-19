@@ -11,6 +11,10 @@
             <span class="stat-icon">📦</span>
             <span class="stat-value">{{ collectedCount }}/{{ totalCount }}</span>
           </div>
+          <div v-if="taskClaimableCount > 0" class="stat-item task-claimable" @click="goToTasks">
+            <span class="stat-icon">🎁</span>
+            <span class="stat-value">{{ taskClaimableCount }}</span>
+          </div>
           <button 
             class="sound-btn" 
             @click="toggleSound"
@@ -40,6 +44,7 @@
       >
         <span class="nav-icon">{{ item.icon }}</span>
         <span class="nav-label">{{ item.label }}</span>
+        <span v-if="item.path === '/task' && taskClaimableCount > 0" class="nav-badge">{{ taskClaimableCount }}</span>
       </RouterLink>
     </nav>
 
@@ -54,25 +59,35 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from './stores/game'
 import { useAudioStore } from './stores/audio'
 import { useMarketStore } from './stores/market'
+import { useTaskStore } from './stores/task'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const marketStore = useMarketStore()
+const taskStore = useTaskStore()
 
 const navItems = [
   { path: '/', icon: '🏠', label: '展柜' },
   { path: '/expedition', icon: '🗺️', label: '远征' },
   { path: '/collage', icon: '🎨', label: '拼装' },
   { path: '/collection', icon: '📖', label: '图鉴' },
-  { path: '/market', icon: '🏪', label: '市场' }
+  { path: '/market', icon: '🏪', label: '市场' },
+  { path: '/task', icon: '⛏️', label: '任务' }
 ]
 
 const collectedCount = computed(() => gameStore.collectedMinerals.length)
 const totalCount = computed(() => gameStore.allMinerals.length)
 const soundEnabled = computed(() => audioStore.soundEnabled)
+const taskClaimableCount = computed(() => taskStore.claimableCount)
 
 const toggleSound = () => {
   audioStore.toggleSound()
+}
+
+const goToTasks = () => {
+  router.push('/task')
 }
 
 const marketUpdateTimer = ref(null)
@@ -81,6 +96,30 @@ onMounted(() => {
   audioStore.loadAudioSettings()
   gameStore.loadProgress()
   marketStore.loadMarketData()
+  taskStore.loadTaskData()
+
+  gameStore.onTaskEvent = (eventName, payload) => {
+    switch (eventName) {
+      case 'expeditionComplete':
+        taskStore.onExpeditionComplete(payload)
+        break
+      case 'staminaSpent':
+        taskStore.onStaminaSpent(payload)
+        break
+      case 'mineralCollected':
+        taskStore.onMineralCollected(payload)
+        break
+      case 'collageComplete':
+        taskStore.onCollageComplete()
+        break
+      case 'coinsEarned':
+        taskStore.onCoinsEarned(payload)
+        break
+      case 'marketTransaction':
+        taskStore.onMarketTransaction(payload)
+        break
+    }
+  }
   
   marketUpdateTimer.value = setInterval(() => {
     marketStore.checkAllAuctions()
@@ -190,6 +229,18 @@ onUnmounted(() => {
   background: linear-gradient(135deg, var(--primary), #ff6b6b);
 }
 
+.task-claimable {
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.3), rgba(255, 107, 107, 0.3));
+  border-color: rgba(233, 69, 96, 0.5);
+  animation: claimablePulse 2s ease-in-out infinite;
+}
+
+@keyframes claimablePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0); }
+  50% { box-shadow: 0 0 12px 2px rgba(233, 69, 96, 0.3); }
+}
+
 .app-main {
   flex: 1;
   overflow: hidden;
@@ -218,6 +269,7 @@ onUnmounted(() => {
   border-radius: 12px;
   color: var(--text-secondary);
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .nav-item.active {
@@ -232,6 +284,24 @@ onUnmounted(() => {
 .nav-label {
   font-size: 12px;
   font-weight: 500;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0 4px;
+  line-height: 1;
 }
 
 @keyframes float {

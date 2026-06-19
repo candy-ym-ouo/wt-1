@@ -204,9 +204,25 @@ export const useResearchStore = defineStore('research', () => {
     if (!stage) return { success: false, message: '阶段不存在' }
 
     gameStore.coins -= stage.coinCost
+    
+    gameStore.addCoinTransaction('research_cost', stage.coinCost, `研究消耗: ${stage.name}`, {
+      stageId,
+      stageName: stage.name,
+      topicId: topic.id,
+      topicName: topic.name,
+      difficulty: topic.difficulty
+    })
 
     if (stage.rewards.coins) {
       gameStore.coins += stage.rewards.coins
+      
+      gameStore.addCoinTransaction('research_reward', stage.rewards.coins, `研究奖励: ${stage.name}`, {
+        stageId,
+        stageName: stage.name,
+        topicId: topic.id,
+        topicName: topic.name,
+        difficulty: topic.difficulty
+      })
     }
     if (stage.rewards.exp) {
       gameStore.addExp(stage.rewards.exp)

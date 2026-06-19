@@ -272,6 +272,13 @@ export const useTaskStore = defineStore('task', () => {
     totalCoinsEarned.value += task.rewards.coins
     dailyClaimed.value[taskId] = true
     claimAnimation.value = { type: 'daily', id: taskId, rewards: task.rewards }
+    
+    gameStore.addCoinTransaction('task_reward', task.rewards.coins, `每日任务: ${task.title}`, {
+      taskId,
+      taskTitle: task.title,
+      taskType: 'daily',
+      rewards: task.rewards
+    })
 
     setTimeout(() => { claimAnimation.value = null }, 2000)
     saveTaskData()
@@ -288,6 +295,13 @@ export const useTaskStore = defineStore('task', () => {
     totalCoinsEarned.value += task.rewards.coins
     weeklyClaimed.value[taskId] = true
     claimAnimation.value = { type: 'weekly', id: taskId, rewards: task.rewards }
+    
+    gameStore.addCoinTransaction('task_reward', task.rewards.coins, `每周目标: ${task.title}`, {
+      taskId,
+      taskTitle: task.title,
+      taskType: 'weekly',
+      rewards: task.rewards
+    })
 
     setTimeout(() => { claimAnimation.value = null }, 2000)
     saveTaskData()
@@ -312,6 +326,14 @@ export const useTaskStore = defineStore('task', () => {
     totalCoinsEarned.value += tier.rewards.coins
     achievementClaimed.value[achievementId].push(tierIndex)
     claimAnimation.value = { type: 'achievement', id: achievementId, tierIndex, rewards: tier.rewards }
+    
+    gameStore.addCoinTransaction('achievement_reward', tier.rewards.coins, `成就达成: ${ach.title} ${tier.tier.name}`, {
+      achievementId,
+      achievementTitle: ach.title,
+      tierIndex,
+      tierName: tier.tier.name,
+      rewards: tier.rewards
+    })
 
     setTimeout(() => { claimAnimation.value = null }, 2000)
     saveTaskData()

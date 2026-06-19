@@ -151,41 +151,58 @@
         <div class="repeated-header">
           <h2 class="section-title">
             <span class="title-icon">💰</span>
-            重复收集收益
+            金币收益明细
           </h2>
-          <span class="repeated-tag">已重复收集 {{ Math.max(0, collectedData?.count - 1 || 0) }}次</span>
+          <button class="view-detail-btn" @click="openCoinFlow">
+            <span>查看详情</span>
+            <span class="arrow">→</span>
+          </button>
         </div>
         <div class="repeated-content">
-          <div class="repeated-desc">
-            <p>每次再次拼装或获取已收集矿物，可获得以下奖励：</p>
+          <div class="coin-summary-row">
+            <div class="coin-summary-item income">
+              <span class="summary-label">累计收入</span>
+              <span class="summary-value">+{{ formatNumber(mineralCoinStats.totalIncome) }}</span>
+            </div>
+            <div class="coin-summary-item expense">
+              <span class="summary-label">累计支出</span>
+              <span class="summary-value">-{{ formatNumber(mineralCoinStats.totalExpense) }}</span>
+            </div>
+            <div class="coin-summary-item net">
+              <span class="summary-label">净收益</span>
+              <span class="summary-value" :class="mineralCoinStats.netChange >= 0 ? 'income' : 'expense'">
+                {{ mineralCoinStats.netChange >= 0 ? '+' : '' }}{{ formatNumber(mineralCoinStats.netChange) }}
+              </span>
+            </div>
           </div>
+          
           <div class="rewards-grid">
             <div class="reward-item coin-reward">
-              <span class="reward-icon">🪙</span>
+              <span class="reward-icon">🔄</span>
               <div class="reward-info">
-                <span class="reward-label">基础金币</span>
-                <span class="reward-value">{{ repeatRewardInfo.baseCoins }} 金币/次</span>
+                <span class="reward-label">重复奖励次数</span>
+                <span class="reward-value">{{ mineralCoinStats.repeatRewardCount }} 次</span>
               </div>
             </div>
-            <div class="reward-item bonus-reward" v-if="repeatRewardInfo.detectorBonus > 0">
-              <span class="reward-icon">🔧</span>
+            <div class="reward-item buy-reward">
+              <span class="reward-icon">�</span>
               <div class="reward-info">
-                <span class="reward-label">探测器加成</span>
-                <span class="reward-value">+{{ repeatRewardInfo.detectorBonus.toFixed(0) }}%</span>
+                <span class="reward-label">购买次数</span>
+                <span class="reward-value">{{ mineralCoinStats.buyCount }} 次</span>
               </div>
             </div>
             <div class="reward-item total-reward">
               <span class="reward-icon">✨</span>
               <div class="reward-info">
-                <span class="reward-label">预计总收益</span>
-                <span class="reward-value highlight">{{ repeatRewardInfo.totalPerRun }} 金币/次</span>
+                <span class="reward-label">预计单次收益</span>
+                <span class="reward-value highlight">{{ repeatRewardInfo.totalPerRun }} 金币</span>
               </div>
             </div>
-            <div class="reward-item history-reward">
-              <span class="reward-icon">📊</span>
+            <div class="reward-item bonus-reward" v-if="repeatRewardInfo.detectorBonus > 0">
+              <span class="reward-icon">�</span>
               <div class="reward-info">
-                <span class="reward-label">累计已获得</span>
-                <span class="reward-value">{{ repeatRewardInfo.totalEarned }} 金币</span>
+                <span class="reward-label">探测器加成</span>
+                <span class="reward-value">+{{ repeatRewardInfo.detectorBonus.toFixed(0) }}%</span>
               </div>
             </div>
           </div>
@@ -463,6 +480,12 @@
       <div class="loading-spinner"></div>
       <p>加载中...</p>
     </div>
+    
+    <CoinFlowModal 
+      :visible="showCoinFlow" 
+      :mineral-id="mineral?.id"
+      @close="closeCoinFlow" 
+    />
   </div>
 </template>
 
@@ -482,6 +505,7 @@ import { getHallsByMineralId } from '@/data/halls'
 import { CATEGORY_CONFIG } from '@/data/research'
 import RatingStars from '@/components/RatingStars.vue'
 import PopularityBadge from '@/components/PopularityBadge.vue'
+import CoinFlowModal from '@/components/CoinFlowModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -491,6 +515,8 @@ const marketStore = useMarketStore()
 const museumStore = useMuseumStore()
 const researchStore = useResearchStore()
 const detectorStore = useDetectorStore()
+
+const showCoinFlow = ref(false)
 
 const getAnyMineralById = (id) => {
   const numericId = Number(id)
@@ -725,6 +751,20 @@ const repeatRewardInfo = computed(() => {
   }
 })
 
+const mineralCoinStats = computed(() => {
+  if (!mineral.value) {
+    return {
+      totalIncome: 0,
+      totalExpense: 0,
+      netChange: 0,
+      repeatRewardCount: 0,
+      buyCount: 0,
+      transactions: []
+    }
+  }
+  return gameStore.getMineralCoinStats(mineral.value.id)
+})
+
 const goBack = () => {
   audioStore.playClick()
   router.back()
@@ -809,6 +849,15 @@ const listMineral = () => {
 const goToResearch = () => {
   audioStore.playClick()
   router.push('/research')
+}
+
+const openCoinFlow = () => {
+  audioStore.playClick()
+  showCoinFlow.value = true
+}
+
+const closeCoinFlow = () => {
+  showCoinFlow.value = false
 }
 
 const goToResearchCard = (cardId) => {
@@ -1889,14 +1938,89 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
-.repeated-tag {
+.view-detail-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 10px;
+  color: #fbbf24;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border-radius: 10px;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-detail-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+  transform: translateX(2px);
+}
+
+.view-detail-btn .arrow {
+  font-size: 11px;
+  transition: transform 0.2s ease;
+}
+
+.view-detail-btn:hover .arrow {
+  transform: translateX(2px);
+}
+
+.coin-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.coin-summary-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.coin-summary-item.income {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(255, 255, 255, 0.02));
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.coin-summary-item.expense {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(255, 255, 255, 0.02));
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.coin-summary-item.net {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(255, 255, 255, 0.02));
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.summary-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.summary-value.income {
+  color: #22c55e;
+}
+
+.summary-value.expense {
+  color: #ef4444;
+}
+
+.buy-reward {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.05));
+  border-color: rgba(168, 85, 247, 0.2);
 }
 
 .repeated-desc {
@@ -2018,6 +2142,18 @@ onMounted(() => {
     width: 32px;
     height: 32px;
     font-size: 20px;
+  }
+  
+  .coin-summary-row {
+    gap: 8px;
+  }
+  
+  .coin-summary-item {
+    padding: 10px 6px;
+  }
+  
+  .summary-value {
+    font-size: 14px;
   }
 }
 </style>

@@ -44,6 +44,101 @@ export const useGameStore = defineStore('game', () => {
   const MAX_LOGS = 200
   const collageStartTime = ref(null)
 
+  const coinTransactions = ref([])
+  const MAX_COIN_TRANSACTIONS = 200
+
+  const COIN_TRANSACTION_TYPE = {
+    INCOME: 'income',
+    EXPENSE: 'expense'
+  }
+
+  const COIN_CATEGORY_CONFIG = {
+    first_discovery: {
+      name: '首次发现',
+      icon: '✨',
+      type: 'income',
+      color: '#22c55e'
+    },
+    repeat_reward: {
+      name: '重复奖励',
+      icon: '🔄',
+      type: 'income',
+      color: '#06b6d4'
+    },
+    collage_bonus: {
+      name: '拼装奖励',
+      icon: '🎨',
+      type: 'income',
+      color: '#ec4899'
+    },
+    expedition_reward: {
+      name: '探险奖励',
+      icon: '🗺️',
+      type: 'income',
+      color: '#3b82f6'
+    },
+    task_reward: {
+      name: '任务奖励',
+      icon: '📋',
+      type: 'income',
+      color: '#f59e0b'
+    },
+    achievement_reward: {
+      name: '成就奖励',
+      icon: '🏆',
+      type: 'income',
+      color: '#ef4444'
+    },
+    season_reward: {
+      name: '赛季奖励',
+      icon: '🎖️',
+      type: 'income',
+      color: '#8b5cf6'
+    },
+    market_sell: {
+      name: '市场出售',
+      icon: '💹',
+      type: 'income',
+      color: '#10b981'
+    },
+    exchange_bonus: {
+      name: '置换奖励',
+      icon: '🔁',
+      type: 'income',
+      color: '#14b8a6'
+    },
+    research_reward: {
+      name: '研究奖励',
+      icon: '🔬',
+      type: 'income',
+      color: '#6366f1'
+    },
+    market_buy: {
+      name: '市场购买',
+      icon: '🛒',
+      type: 'expense',
+      color: '#ef4444'
+    },
+    exchange_cost: {
+      name: '置换消耗',
+      icon: '💸',
+      type: 'expense',
+      color: '#f97316'
+    },
+    gacha_buy: {
+      name: '盲盒购买',
+      icon: '🎁',
+      type: 'expense',
+      color: '#a855f7'
+    },
+    research_cost: {
+      name: '研究消耗',
+      icon: '🔬',
+      type: 'expense',
+      color: '#64748b'
+    }
+  }
+
   const onTaskEvent = ref(null)
 
   const emitTaskEvent = (eventName, payload) => {
@@ -95,6 +190,144 @@ export const useGameStore = defineStore('game', () => {
 
   const getSourceConfig = (source) => {
     return SOURCE_CONFIG[source] || { name: source, icon: '📦', color: '#6b7280' }
+  }
+
+  const getCoinCategoryConfig = (category) => {
+    return COIN_CATEGORY_CONFIG[category] || { 
+      name: category, 
+      icon: '💰', 
+      type: 'income',
+      color: '#6b7280' 
+    }
+  }
+
+  const addCoinTransaction = (category, amount, description = '', extraData = {}) => {
+    const config = getCoinCategoryConfig(category)
+    const transaction = {
+      id: `coin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      category,
+      categoryName: config.name,
+      categoryIcon: config.icon,
+      categoryColor: config.color,
+      type: config.type,
+      amount: Math.abs(amount),
+      description,
+      extraData,
+      balanceAfter: coins.value,
+      timestamp: Date.now()
+    }
+
+    coinTransactions.value.unshift(transaction)
+    
+    if (coinTransactions.value.length > MAX_COIN_TRANSACTIONS) {
+      coinTransactions.value = coinTransactions.value.slice(0, MAX_COIN_TRANSACTIONS)
+    }
+
+    saveProgress()
+    return transaction
+  }
+
+  const getCoinTransactions = ({ 
+    type = null, 
+    category = null, 
+    mineralId = null,
+    limit = null,
+    startDate = null,
+    endDate = null
+  } = {}) => {
+    let transactions = [...coinTransactions.value]
+    
+    if (type) {
+      transactions = transactions.filter(t => t.type === type)
+    }
+    if (category) {
+      transactions = transactions.filter(t => t.category === category)
+    }
+    if (mineralId) {
+      transactions = transactions.filter(t => t.extraData?.mineralId === mineralId)
+    }
+    if (startDate) {
+      transactions = transactions.filter(t => t.timestamp >= startDate)
+    }
+    if (endDate) {
+      transactions = transactions.filter(t => t.timestamp <= endDate)
+    }
+    if (limit) {
+      transactions = transactions.slice(0, limit)
+    }
+    
+    return transactions
+  }
+
+  const getCoinStats = ({ startDate = null, endDate = null } = {}) => {
+    const transactions = getCoinTransactions({ startDate, endDate })
+    
+    let totalIncome = 0
+    let totalExpense = 0
+    const categoryStats = {}
+
+    for (const t of transactions) {
+      if (t.type === 'income') {
+        totalIncome += t.amount
+      } else {
+        totalExpense += t.amount
+      }
+      
+      if (!categoryStats[t.category]) {
+        const config = getCoinCategoryConfig(t.category)
+        categoryStats[t.category] = {
+          category: t.category,
+          name: config.name,
+          icon: config.icon,
+          color: config.color,
+          type: config.type,
+          amount: 0,
+          count: 0
+        }
+      }
+      categoryStats[t.category].amount += t.amount
+      categoryStats[t.category].count++
+    }
+
+    return {
+      totalIncome,
+      totalExpense,
+      netChange: totalIncome - totalExpense,
+      categoryStats: Object.values(categoryStats).sort((a, b) => b.amount - a.amount),
+      transactionCount: transactions.length
+    }
+  }
+
+  const getMineralCoinStats = (mineralId) => {
+    const transactions = getCoinTransactions({ mineralId })
+    
+    let totalIncome = 0
+    let totalExpense = 0
+    let repeatRewardCount = 0
+    let buyCount = 0
+
+    for (const t of transactions) {
+      if (t.type === 'income') {
+        totalIncome += t.amount
+        if (t.category === 'repeat_reward') {
+          repeatRewardCount++
+        }
+      } else {
+        totalExpense += t.amount
+        if (t.category === 'market_buy') {
+          buyCount++
+        }
+      }
+    }
+
+    return {
+      totalIncome,
+      totalExpense,
+      netChange: totalIncome - totalExpense,
+      repeatRewardCount,
+      buyCount,
+      transactions
+    }
   }
 
   const addDiscoveryLog = (mineral, source, sourceData, rewards, keyEvents = []) => {
@@ -197,12 +430,34 @@ export const useGameStore = defineStore('game', () => {
         coins.value += bonusCoins
         earnedCoins = bonusCoins + extraCoins
         emitTaskEvent('coinsEarned', bonusCoins)
+        
+        addCoinTransaction('first_discovery', bonusCoins, `首次发现 ${mineral.name}`, {
+          mineralId: mineral.id,
+          mineralName: mineral.name,
+          mineralEmoji: mineral.emoji,
+          rarity: mineral.rarity,
+          source,
+          baseCoins,
+          bonusCoins
+        })
       } else {
         earnedCoins = extraCoins
         if (extraCoins > 0) {
           coins.value += extraCoins
           emitTaskEvent('coinsEarned', extraCoins)
         }
+      }
+      
+      if (extraCoins > 0) {
+        const extraCategory = source === 'collage' ? 'collage_bonus' : 
+                            source === 'expedition' ? 'expedition_reward' : 'first_discovery'
+        addCoinTransaction(extraCategory, extraCoins, `${mineral.name} ${source === 'collage' ? '拼装' : '获取'}奖励`, {
+          mineralId: mineral.id,
+          mineralName: mineral.name,
+          mineralEmoji: mineral.emoji,
+          rarity: mineral.rarity,
+          source
+        })
       }
       
       isNew = true
@@ -241,12 +496,35 @@ export const useGameStore = defineStore('game', () => {
         coins.value += bonusCoins
         earnedCoins = bonusCoins + extraCoins
         emitTaskEvent('coinsEarned', bonusCoins)
+        
+        addCoinTransaction('repeat_reward', bonusCoins, `重复收集 ${mineral.name} x${dropCount}`, {
+          mineralId: mineral.id,
+          mineralName: mineral.name,
+          mineralEmoji: mineral.emoji,
+          rarity: mineral.rarity,
+          source,
+          dropCount,
+          baseCoins,
+          bonusCoins
+        })
       } else {
         earnedCoins = extraCoins
         if (extraCoins > 0) {
           coins.value += extraCoins
           emitTaskEvent('coinsEarned', extraCoins)
         }
+      }
+      
+      if (extraCoins > 0) {
+        const extraCategory = source === 'collage' ? 'collage_bonus' : 
+                            source === 'expedition' ? 'expedition_reward' : 'repeat_reward'
+        addCoinTransaction(extraCategory, extraCoins, `${mineral.name} ${source === 'collage' ? '拼装' : '获取'}奖励`, {
+          mineralId: mineral.id,
+          mineralName: mineral.name,
+          mineralEmoji: mineral.emoji,
+          rarity: mineral.rarity,
+          source
+        })
       }
       
       emitTaskEvent('mineralCollected', mineral)
@@ -439,6 +717,7 @@ export const useGameStore = defineStore('game', () => {
       lastStaminaRegen: lastStaminaRegen.value,
       expeditionHistory: expeditionHistory.value,
       discoveryLogs: discoveryLogs.value,
+      coinTransactions: coinTransactions.value,
       savedAt: Date.now()
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
@@ -668,6 +947,119 @@ export const useGameStore = defineStore('game', () => {
     return mockLogs.sort((a, b) => b.timestamp - a.timestamp)
   }
 
+  const generateMockCoinTransactions = () => {
+    const mockTransactions = []
+    const incomeCategories = [
+      { category: 'first_discovery', weight: 15 },
+      { category: 'repeat_reward', weight: 30 },
+      { category: 'collage_bonus', weight: 15 },
+      { category: 'expedition_reward', weight: 20 },
+      { category: 'task_reward', weight: 10 },
+      { category: 'market_sell', weight: 10 }
+    ]
+    const expenseCategories = [
+      { category: 'market_buy', weight: 40 },
+      { category: 'exchange_cost', weight: 20 },
+      { category: 'gacha_buy', weight: 25 },
+      { category: 'research_cost', weight: 15 }
+    ]
+    
+    const totalWeight = (arr) => arr.reduce((sum, item) => sum + item.weight, 0)
+    const pickCategory = (arr) => {
+      const rand = Math.random() * totalWeight(arr)
+      let cumulative = 0
+      for (const item of arr) {
+        cumulative += item.weight
+        if (rand <= cumulative) return item.category
+      }
+      return arr[0].category
+    }
+
+    let mockCoins = 100
+    
+    for (let i = 0; i < 50; i++) {
+      const isIncome = Math.random() < 0.6
+      const category = isIncome ? pickCategory(incomeCategories) : pickCategory(expenseCategories)
+      const config = COIN_CATEGORY_CONFIG[category]
+      
+      let amount = 0
+      let description = ''
+      const extraData = {}
+      
+      if (isIncome) {
+        switch (category) {
+          case 'first_discovery':
+            amount = Math.floor(Math.random() * 80) + 20
+            description = `首次发现矿物`
+            break
+          case 'repeat_reward':
+            amount = Math.floor(Math.random() * 30) + 10
+            description = `重复收集奖励`
+            break
+          case 'collage_bonus':
+            amount = Math.floor(Math.random() * 50) + 20
+            description = `拼装完成奖励`
+            break
+          case 'expedition_reward':
+            amount = Math.floor(Math.random() * 100) + 30
+            description = `探险完成奖励`
+            break
+          case 'task_reward':
+            amount = Math.floor(Math.random() * 60) + 20
+            description = `任务完成奖励`
+            break
+          case 'market_sell':
+            amount = Math.floor(Math.random() * 200) + 50
+            description = `市场出售矿物`
+            break
+          default:
+            amount = 10
+        }
+        mockCoins += amount
+      } else {
+        switch (category) {
+          case 'market_buy':
+            amount = Math.floor(Math.random() * 300) + 50
+            description = `市场购买矿物`
+            break
+          case 'exchange_cost':
+            amount = Math.floor(Math.random() * 150) + 50
+            description = `稀有度升级消耗`
+            break
+          case 'gacha_buy':
+            amount = Math.floor(Math.random() * 100) + 30
+            description = `购买盲盒券`
+            break
+          case 'research_cost':
+            amount = Math.floor(Math.random() * 80) + 20
+            description = `研究消耗`
+            break
+          default:
+            amount = 10
+        }
+        mockCoins -= amount
+      }
+      
+      const timestamp = Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
+      
+      mockTransactions.push({
+        id: `coin_mock_${i}`,
+        category,
+        categoryName: config.name,
+        categoryIcon: config.icon,
+        categoryColor: config.color,
+        type: config.type,
+        amount: Math.abs(amount),
+        description,
+        extraData,
+        balanceAfter: Math.max(0, mockCoins),
+        timestamp
+      })
+    }
+    
+    return mockTransactions.sort((a, b) => b.timestamp - a.timestamp)
+  }
+
   const loadProgress = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -685,11 +1077,13 @@ export const useGameStore = defineStore('game', () => {
         lastStaminaRegen.value = progress.lastStaminaRegen || Date.now()
         expeditionHistory.value = progress.expeditionHistory || []
         discoveryLogs.value = progress.discoveryLogs || []
+        coinTransactions.value = progress.coinTransactions || []
         
         regenStamina()
       } else {
         collectedMinerals.value = generateMockCollectedMinerals()
         discoveryLogs.value = generateMockDiscoveryLogs()
+        coinTransactions.value = generateMockCoinTransactions()
         coins.value = 5000
         totalCollages.value = 20
         saveProgress()
@@ -698,6 +1092,7 @@ export const useGameStore = defineStore('game', () => {
       console.error('Failed to load progress:', e)
       collectedMinerals.value = generateMockCollectedMinerals()
       discoveryLogs.value = generateMockDiscoveryLogs()
+      coinTransactions.value = generateMockCoinTransactions()
       coins.value = 5000
     }
   }
@@ -723,6 +1118,7 @@ export const useGameStore = defineStore('game', () => {
     showRewardModal.value = false
     expeditionHistory.value = []
     discoveryLogs.value = []
+    coinTransactions.value = []
     localStorage.removeItem(STORAGE_KEY)
   }
 
@@ -995,6 +1391,9 @@ export const useGameStore = defineStore('game', () => {
     showRewardModal,
     expeditionHistory,
     discoveryLogs,
+    coinTransactions,
+    COIN_TRANSACTION_TYPE,
+    COIN_CATEGORY_CONFIG,
     allMinerals,
     allLocations,
     collectionProgress,
@@ -1026,6 +1425,11 @@ export const useGameStore = defineStore('game', () => {
     getDiscoveryLogs,
     getDiscoveryLogsByDate,
     getSourceConfig,
+    getCoinCategoryConfig,
+    addCoinTransaction,
+    getCoinTransactions,
+    getCoinStats,
+    getMineralCoinStats,
     closeRewardModal,
     cancelExpedition,
     getLocation,

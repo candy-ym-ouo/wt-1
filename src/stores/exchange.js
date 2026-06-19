@@ -150,6 +150,17 @@ export const useExchangeStore = defineStore('exchange', () => {
     exchangePoints.value += afterTax
     const coinBonus = Math.round(afterTax * 0.5)
     gameStore.coins += coinBonus
+    
+    gameStore.addCoinTransaction('exchange_bonus', coinBonus, `置换 ${mineral.name} x${exchangeCount} 奖励`, {
+      mineralId,
+      mineralName: mineral.name,
+      mineralEmoji: mineral.emoji,
+      rarity: mineral.rarity,
+      exchangeType: 'duplicate',
+      count: exchangeCount,
+      pointsGained: afterTax,
+      taxPaid: taxAmount
+    })
 
     const record = {
       id: Date.now(),
@@ -237,13 +248,20 @@ export const useExchangeStore = defineStore('exchange', () => {
 
     gameStore.collectedMinerals = gameStore.collectedMinerals.filter(m => m.count > 0)
 
-    gameStore.coins -= config.coinCost
-
     const targetMineral = getRandomMineralByRarity(config.targetRarity)
     if (!targetMineral) {
-      gameStore.coins += config.coinCost
       return { success: false, message: '没有可兑换的目标矿物' }
     }
+
+    gameStore.coins -= config.coinCost
+    
+    gameStore.addCoinTransaction('exchange_cost', config.coinCost, `${RARITY_CONFIG[fromRarity].name}升级消耗`, {
+      fromRarity,
+      fromRarityName: RARITY_CONFIG[fromRarity].name,
+      toRarity: config.targetRarity,
+      toRarityName: RARITY_CONFIG[config.targetRarity].name,
+      exchangeType: 'rarity_conversion'
+    })
 
     const isNew = gameStore.collectMineral(targetMineral, 'exchange', {
       type: 'rarity_conversion',

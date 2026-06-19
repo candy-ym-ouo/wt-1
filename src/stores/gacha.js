@@ -77,6 +77,13 @@ export const useGachaStore = defineStore('gacha', () => {
     gameStore.coins -= ticket.coinPrice
     tickets.value[ticketType] = (tickets.value[ticketType] || 0) + 1
     gameStore.emitTaskEvent?.('coinsEarned', -ticket.coinPrice)
+    
+    gameStore.addCoinTransaction('gacha_buy', ticket.coinPrice, `购买 ${ticket.name}`, {
+      ticketType,
+      ticketName: ticket.name,
+      count: 1
+    })
+    
     gameStore.saveProgress()
     saveProgress()
 
@@ -97,6 +104,13 @@ export const useGachaStore = defineStore('gacha', () => {
     gameStore.coins -= totalCost
     tickets.value[ticketType] = (tickets.value[ticketType] || 0) + count
     gameStore.emitTaskEvent?.('coinsEarned', -totalCost)
+    
+    gameStore.addCoinTransaction('gacha_buy', totalCost, `购买 ${count} 张 ${ticket.name}`, {
+      ticketType,
+      ticketName: ticket.name,
+      count
+    })
+    
     gameStore.saveProgress()
     saveProgress()
 

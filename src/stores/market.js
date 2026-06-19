@@ -205,12 +205,34 @@ export const useMarketStore = defineStore('market', () => {
       if (winningBid.bidderId === 'player') {
         gameStore.coins -= winningBid.amount
         addMineralToPlayer(listing.mineralId)
+        
+        const mineral = getMineralById(listing.mineralId)
+        gameStore.addCoinTransaction('market_buy', winningBid.amount, `购买 ${mineral?.name || '矿物'}`, {
+          mineralId: listing.mineralId,
+          mineralName: mineral?.name,
+          mineralEmoji: mineral?.emoji,
+          rarity: mineral?.rarity,
+          listingId: listing.id,
+          sellerName: listing.sellerName
+        })
       }
       
       if (listing.sellerId === 'player') {
         const sellerEarnings = Math.round(winningBid.amount * 0.95)
         gameStore.coins += sellerEarnings
         gameStore.emitTaskEvent('marketTransaction', sellerEarnings)
+        
+        const mineral = getMineralById(listing.mineralId)
+        gameStore.addCoinTransaction('market_sell', sellerEarnings, `出售 ${mineral?.name || '矿物'}`, {
+          mineralId: listing.mineralId,
+          mineralName: mineral?.name,
+          mineralEmoji: mineral?.emoji,
+          rarity: mineral?.rarity,
+          listingId: listing.id,
+          buyerName: winningBid.bidderName,
+          originalPrice: winningBid.amount,
+          fee: winningBid.amount - sellerEarnings
+        })
       }
       
       recordTransaction(listing, winningBid)

@@ -108,6 +108,7 @@ import { useQuizStore } from './stores/quiz'
 import { useExchangeStore } from './stores/exchange'
 import { useSeasonStore } from './stores/season'
 import { useDetectorStore } from './stores/detector'
+import { useResearchStore } from './stores/research'
 import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
 import { useRouter } from 'vue-router'
 import { MINERALS } from './data/minerals'
@@ -124,6 +125,7 @@ const quizStore = useQuizStore()
 const exchangeStore = useExchangeStore()
 const seasonStore = useSeasonStore()
 const detectorStore = useDetectorStore()
+const researchStore = useResearchStore()
 
 const navItems = [
   { path: '/', icon: '🏛️', label: '博物馆' },
@@ -136,6 +138,7 @@ const navItems = [
   { path: '/gacha', icon: '🎁', label: '盲盒' },
   { path: '/market', icon: '🏪', label: '市场' },
   { path: '/exchange', icon: '🔄', label: '交换' },
+  { path: '/research', icon: '🔬', label: '研究院' },
   { path: '/task', icon: '⛏️', label: '任务' }
 ]
 
@@ -191,6 +194,7 @@ onMounted(() => {
   exchangeStore.loadExchangeData()
   seasonStore.loadSeasonData()
   detectorStore.loadProgress()
+  researchStore.loadProgress()
 
   gameStore.onTaskEvent = (eventName, payload) => {
     switch (eventName) {
@@ -218,6 +222,9 @@ onMounted(() => {
         break
       case 'marketBid':
         taskStore.onMarketBid()
+        break
+      case 'researchComplete':
+        taskStore.onCoinsEarned(payload?.coins || 0)
         break
     }
   }

@@ -14,7 +14,8 @@ export const SOURCE_TYPES = {
   EXCHANGE: 'exchange',
   GACHA: 'gacha',
   SEASON: 'season',
-  QUIZ: 'quiz'
+  QUIZ: 'quiz',
+  RESEARCH: 'research'
 }
 
 export const SOURCE_CONFIG = {
@@ -52,6 +53,11 @@ export const SOURCE_CONFIG = {
     name: '问答',
     emoji: '❓',
     color: '#10b981'
+  },
+  [SOURCE_TYPES.RESEARCH]: {
+    name: '研究院',
+    emoji: '🔬',
+    color: '#6366f1'
   }
 }
 

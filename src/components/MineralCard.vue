@@ -30,6 +30,15 @@
         <span class="lock-text">未收集</span>
       </div>
     </div>
+    <div
+      v-if="isCollected && knowledgeCardCount > 0"
+      class="knowledge-badge"
+      :class="{ 'has-total': totalKnowledgeCards > 0 }"
+      :title="`已解锁 ${knowledgeCardCount}/${totalKnowledgeCards || knowledgeCardCount} 张知识卡片`"
+    >
+      <span class="kb-icon">📇</span>
+      <span class="kb-count">{{ knowledgeCardCount }}</span>
+    </div>
   </div>
 </template>
 
@@ -61,6 +70,14 @@ const props = defineProps({
   size: {
     type: String,
     default: 'normal'
+  },
+  knowledgeCardCount: {
+    type: Number,
+    default: 0
+  },
+  totalKnowledgeCards: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -239,5 +256,41 @@ const handleClick = () => {
 @keyframes pulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.6; }
+}
+
+.knowledge-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(99, 102, 241, 0.95));
+  border: 1px solid rgba(192, 132, 252, 0.5);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.5);
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+.kb-icon {
+  font-size: 10px;
+}
+
+.kb-count {
+  font-family: 'Courier New', monospace;
+}
+
+.knowledge-badge.has-total {
+  animation: kbShine 3s ease-in-out infinite;
+}
+
+@keyframes kbShine {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 </style>

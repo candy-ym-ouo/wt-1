@@ -49,6 +49,22 @@
           </div>
           <div class="progress-text">{{ progress.percentage }}% 完成</div>
         </div>
+        <div class="progress-card knowledge-progress-card">
+          <div class="progress-info">
+            <span class="progress-label">📇 知识卡片</span>
+            <span class="progress-value purple">{{ researchProgress.unlocked }}/{{ researchProgress.total }}</span>
+          </div>
+          <div class="progress-bar-large">
+            <div
+              class="progress-fill knowledge-fill"
+              :style="{ width: `${researchProgress.percentage}%` }"
+            ></div>
+          </div>
+          <div class="progress-text">
+            {{ researchProgress.percentage }}% 已解锁
+            <span class="research-link" @click="goToResearch">去研究院 →</span>
+          </div>
+        </div>
       </div>
 
       <div class="filter-section">
@@ -82,6 +98,10 @@
         <button class="btn btn-small warehouse-entry-btn" @click="goToWarehouse">
           <span class="btn-icon">🏭</span>
           仓储管理
+        </button>
+        <button class="btn btn-small research-collection-entry-btn" @click="goToResearch">
+          <span class="btn-icon">🔬</span>
+          矿物研究院
         </button>
         <button class="btn btn-small" @click="goToMarket">
           <span class="btn-icon">🏪</span>
@@ -154,6 +174,8 @@
             :is-collected="isMineralCollected(mineral.id)"
             :show-locked="true"
             :glow="isMineralCollected(mineral.id) && mineral.rarity === 'legendary'"
+            :knowledge-card-count="getMineralUnlockedCardCount(mineral.id)"
+            :total-knowledge-cards="getMineralTotalCardCount(mineral.id)"
             @click="viewMineralDetail"
           />
         </div>
@@ -165,7 +187,16 @@
             :class="['list-item', { collected: isMineralCollected(mineral.id) }]"
             @click="viewMineralDetail(mineral)"
           >
-            <span class="item-emoji">{{ isMineralCollected(mineral.id) ? mineral.emoji : '❓' }}</span>
+            <div class="item-emoji-wrap">
+              <span class="item-emoji">{{ isMineralCollected(mineral.id) ? mineral.emoji : '❓' }}</span>
+              <div
+                v-if="isMineralCollected(mineral.id) && getMineralUnlockedCardCount(mineral.id) > 0"
+                class="list-kb-badge"
+                :title="`已解锁 ${getMineralUnlockedCardCount(mineral.id)}/${getMineralTotalCardCount(mineral.id)} 张知识卡片`"
+              >
+                📇 {{ getMineralUnlockedCardCount(mineral.id) }}
+              </div>
+            </div>
             <div class="item-content">
               <div class="item-header">
                 <h3 class="item-name">{{ isMineralCollected(mineral.id) ? mineral.name : '???' }}</h3>
@@ -528,9 +559,11 @@ import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
 import { useSeasonStore } from '@/stores/season'
 import { useDetectorStore } from '@/stores/detector'
+import { useResearchStore } from '@/stores/research'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { MINERALS } from '@/data/minerals'
 import { SEASONS } from '@/data/season'
+import { getKnowledgeCardsByMineralId } from '@/data/research'
 import { 
   DETECTOR_TIER_CONFIG, 
   DETECTOR_TIERS,
@@ -543,6 +576,7 @@ const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const seasonStore = useSeasonStore()
 const detectorStore = useDetectorStore()
+const researchStore = useResearchStore()
 
 const activeTab = ref('collection')
 const toastMessage = ref('')
@@ -637,6 +671,7 @@ const filters = [
   { label: '已收集', value: 'collected' },
   { label: '未收集', value: 'uncollected' },
   { label: '赛季限定', value: 'season' },
+  { label: '研究解锁', value: 'has_research' },
   { label: '传说', value: RARITY.LEGENDARY },
   { label: '史诗', value: RARITY.EPIC },
   { label: '珍稀', value: RARITY.RARE }
@@ -652,6 +687,16 @@ const progress = computed(() => {
   }
 })
 
+const researchProgress = computed(() => researchStore.cardStats)
+
+const getMineralUnlockedCardCount = (mineralId) => {
+  return researchStore.getCardsForMineral(mineralId).length
+}
+
+const getMineralTotalCardCount = (mineralId) => {
+  return getKnowledgeCardsByMineralId(mineralId).length
+}
+
 const filteredMinerals = computed(() => {
   let minerals = [...ALL_MINERALS_WITH_SEASON.value].sort((a, b) => {
     const rarityOrder = { legendary: 0, epic: 1, rare: 2, uncommon: 3, common: 4 }
@@ -664,6 +709,11 @@ const filteredMinerals = computed(() => {
     minerals = minerals.filter(m => !gameStore.isMineralCollected(m.id))
   } else if (activeFilter.value === 'season') {
     minerals = minerals.filter(m => m.seasonExclusive)
+  } else if (activeFilter.value === 'has_research') {
+    minerals = minerals.filter(m => {
+      if (!gameStore.isMineralCollected(m.id)) return false
+      return getMineralUnlockedCardCount(m.id) > 0
+    })
   } else if (activeFilter.value !== 'all') {
     minerals = minerals.filter(m => m.rarity === activeFilter.value)
   }
@@ -742,6 +792,11 @@ const viewSeasonSpecimen = (specimen) => {
 const goToWarehouse = () => {
   audioStore.playClick()
   router.push('/warehouse')
+}
+
+const goToResearch = () => {
+  audioStore.playClick()
+  router.push('/research')
 }
 </script>
 
@@ -839,6 +894,9 @@ const goToWarehouse = () => {
 
 .progress-section {
   margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .progress-card {
@@ -846,6 +904,34 @@ const goToWarehouse = () => {
   border-radius: 16px;
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.knowledge-progress-card {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.08)) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+}
+
+.progress-value.purple {
+  color: #c084fc !important;
+}
+
+.research-link {
+  color: #c084fc;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  transition: all 0.2s ease;
+}
+
+.research-link:hover {
+  color: #e9d5ff;
+}
+
+.knowledge-fill {
+  background: linear-gradient(90deg, #a855f7, #6366f1, #3b82f6) !important;
 }
 
 .progress-info {
@@ -1170,6 +1256,27 @@ const goToWarehouse = () => {
   flex-shrink: 0;
 }
 
+.item-emoji-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.list-kb-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  padding: 1px 6px;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid rgba(192, 132, 252, 0.5);
+  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.4);
+  white-space: nowrap;
+  z-index: 1;
+}
+
 .item-content {
   flex: 1;
   min-width: 0;
@@ -1255,6 +1362,15 @@ const goToWarehouse = () => {
 
 .exchange-entry-btn:hover {
   box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
+}
+
+.research-collection-entry-btn {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
+}
+
+.research-collection-entry-btn:hover {
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
 }
 
 .warehouse-entry-btn {
@@ -1953,6 +2069,18 @@ const goToWarehouse = () => {
 
   .specific-rarity-card {
     grid-column: span 1;
+  }
+
+  .progress-section {
+    grid-template-columns: 1fr;
+  }
+
+  .action-bar {
+    flex-wrap: wrap;
+  }
+
+  .action-bar .btn {
+    flex: 1 0 45%;
   }
 }
 

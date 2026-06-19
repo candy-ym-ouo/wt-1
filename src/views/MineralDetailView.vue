@@ -182,6 +182,50 @@
             <p class="content-text">{{ mineral.funFact }}</p>
           </div>
         </div>
+
+        <div
+          class="info-section knowledge-section"
+          :style="{ '--card-color': relatedCards.length > 0 ? getCategoryColor(relatedCards[0]?.category) : '#6b7280' }"
+        >
+          <div class="knowledge-header">
+            <h2 class="section-title">
+              <span class="title-icon">📇</span>
+              研究知识
+            </h2>
+            <button
+              v-if="relatedCards.length === 0"
+              class="btn btn-small research-entry-btn"
+              @click="goToResearch"
+            >
+              🔬 前往研究院解锁
+            </button>
+          </div>
+          <div v-if="relatedCards.length === 0" class="knowledge-empty">
+            <div class="knowledge-empty-icon">🔬</div>
+            <p class="knowledge-empty-text">完成相关研究课题可解锁该矿物的深度知识</p>
+          </div>
+          <div v-else class="knowledge-cards">
+            <div
+              v-for="card in relatedCards"
+              :key="card.id"
+              class="knowledge-mini-card"
+              :style="{ borderLeftColor: getCategoryColor(card.category) }"
+              @click="goToResearchCard(card.id)"
+            >
+              <div class="kmc-top">
+                <span class="kmc-icon">{{ card.icon }}</span>
+                <span class="kmc-category" :style="{ color: getCategoryColor(card.category) }">
+                  {{ getCategoryName(card.category) }}
+                </span>
+              </div>
+              <h4 class="kmc-title">{{ card.title }}</h4>
+              <p class="kmc-content">{{ card.content }}</p>
+              <div class="kmc-source">
+                来自: {{ card.topicName }} · {{ card.stageName }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="market-info card">
@@ -315,10 +359,12 @@ import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
 import { useMuseumStore } from '@/stores/museum'
+import { useResearchStore } from '@/stores/research'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 import { getMineralById } from '@/data/minerals'
 import { SEASONS } from '@/data/season'
 import { getHallsByMineralId } from '@/data/halls'
+import { CATEGORY_CONFIG } from '@/data/research'
 import RatingStars from '@/components/RatingStars.vue'
 import PopularityBadge from '@/components/PopularityBadge.vue'
 
@@ -328,6 +374,7 @@ const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const museumStore = useMuseumStore()
+const researchStore = useResearchStore()
 
 const getAnyMineralById = (id) => {
   const numericId = Number(id)
@@ -385,6 +432,15 @@ const relatedHalls = computed(() => {
   if (!mineral.value) return []
   return getHallsByMineralId(mineral.value.id)
 })
+
+const relatedCards = computed(() => {
+  if (!mineral.value) return []
+  return researchStore.getCardsForMineral(mineral.value.id)
+})
+
+const getCategoryColor = (category) => CATEGORY_CONFIG[category]?.color || '#6b7280'
+const getCategoryName = (category) => CATEGORY_CONFIG[category]?.name || '未知'
+const getCategoryGradient = (category) => CATEGORY_CONFIG[category]?.gradient || 'linear-gradient(135deg, #6b7280, #9ca3af)'
 
 const getDistCount = (star) => {
   return mineralRating.value.distribution?.[star] || 0
@@ -512,6 +568,19 @@ const listMineral = () => {
   router.push('/market')
   setTimeout(() => {
     marketStore.openListModal(mineral.value)
+  }, 100)
+}
+
+const goToResearch = () => {
+  audioStore.playClick()
+  router.push('/research')
+}
+
+const goToResearchCard = (cardId) => {
+  audioStore.playClick()
+  router.push('/research')
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('open-research-card', { detail: { cardId } }))
   }, 100)
 }
 
@@ -1288,5 +1357,105 @@ onMounted(() => {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.knowledge-section {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.06), rgba(59, 130, 246, 0.06)) !important;
+  border-color: color-mix(in srgb, var(--card-color) 25%, transparent) !important;
+}
+
+.knowledge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.research-entry-btn {
+  background: linear-gradient(135deg, #a855f7, #6366f1) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3) !important;
+}
+
+.knowledge-empty {
+  text-align: center;
+  padding: 28px 20px;
+  border: 1px dashed rgba(168, 85, 247, 0.25);
+  border-radius: 12px;
+  background: rgba(168, 85, 247, 0.03);
+}
+
+.knowledge-empty-icon {
+  font-size: 40px;
+  opacity: 0.5;
+  margin-bottom: 10px;
+}
+
+.knowledge-empty-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.knowledge-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.knowledge-mini-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 16px;
+  border-left: 4px solid;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.knowledge-mini-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(3px);
+}
+
+.kmc-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.kmc-icon {
+  font-size: 22px;
+}
+
+.kmc-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.kmc-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.kmc-content {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.75;
+  margin: 0 0 10px 0;
+}
+
+.kmc-source {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.65;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 </style>

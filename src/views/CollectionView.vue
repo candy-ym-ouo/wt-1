@@ -173,12 +173,33 @@ import { useMarketStore } from '@/stores/market'
 import { useSeasonStore } from '@/stores/season'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { MINERALS } from '@/data/minerals'
+import { SEASONS } from '@/data/season'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const seasonStore = useSeasonStore()
+
+const getSeasonLimitedMinerals = () => {
+  const list = []
+  for (const season of SEASONS) {
+    if (season.limitedSpecimens) {
+      for (const specimen of season.limitedSpecimens) {
+        list.push({
+          ...specimen,
+          seasonId: season.id,
+          seasonName: season.name
+        })
+      }
+    }
+  }
+  return list
+}
+
+const ALL_MINERALS_WITH_SEASON = computed(() => {
+  return [...MINERALS, ...getSeasonLimitedMinerals()]
+})
 
 const activeFilter = ref('all')
 const viewMode = ref('grid')
@@ -187,15 +208,24 @@ const filters = [
   { label: '全部', value: 'all' },
   { label: '已收集', value: 'collected' },
   { label: '未收集', value: 'uncollected' },
+  { label: '赛季限定', value: 'season' },
   { label: '传说', value: RARITY.LEGENDARY },
   { label: '史诗', value: RARITY.EPIC },
   { label: '珍稀', value: RARITY.RARE }
 ]
 
-const progress = computed(() => gameStore.collectionProgress)
+const progress = computed(() => {
+  const all = ALL_MINERALS_WITH_SEASON.value
+  const collected = all.filter(m => gameStore.isMineralCollected(m.id)).length
+  return {
+    collected,
+    total: all.length,
+    percentage: Math.round((collected / all.length) * 100)
+  }
+})
 
 const filteredMinerals = computed(() => {
-  let minerals = [...MINERALS].sort((a, b) => {
+  let minerals = [...ALL_MINERALS_WITH_SEASON.value].sort((a, b) => {
     const rarityOrder = { legendary: 0, epic: 1, rare: 2, uncommon: 3, common: 4 }
     return rarityOrder[a.rarity] - rarityOrder[b.rarity]
   })
@@ -204,6 +234,8 @@ const filteredMinerals = computed(() => {
     minerals = minerals.filter(m => gameStore.isMineralCollected(m.id))
   } else if (activeFilter.value === 'uncollected') {
     minerals = minerals.filter(m => !gameStore.isMineralCollected(m.id))
+  } else if (activeFilter.value === 'season') {
+    minerals = minerals.filter(m => m.seasonExclusive)
   } else if (activeFilter.value !== 'all') {
     minerals = minerals.filter(m => m.rarity === activeFilter.value)
   }
@@ -214,8 +246,8 @@ const filteredMinerals = computed(() => {
 const isMineralCollected = (id) => gameStore.isMineralCollected(id)
 
 const getRarityCount = (rarity) => {
-  const total = MINERALS.filter(m => m.rarity === rarity).length
-  const collected = MINERALS.filter(m => m.rarity === rarity && gameStore.isMineralCollected(m.id)).length
+  const total = ALL_MINERALS_WITH_SEASON.value.filter(m => m.rarity === rarity).length
+  const collected = ALL_MINERALS_WITH_SEASON.value.filter(m => m.rarity === rarity && gameStore.isMineralCollected(m.id)).length
   return `${collected}/${total}`
 }
 
@@ -276,7 +308,7 @@ const viewSeasonSpecimen = (specimen) => {
     return
   }
   audioStore.playClick()
-  router.push('/season')
+  router.push(`/mineral/${specimen.id}`)
 }
 </script>
 

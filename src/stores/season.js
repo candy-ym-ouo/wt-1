@@ -13,6 +13,8 @@ import {
 } from '@/data/season'
 import { RARITY } from '@/data/rarity'
 import { useGameStore } from './game'
+import { useGachaStore } from './gacha'
+import { TICKET_TYPES } from '@/data/gacha'
 
 const STORAGE_KEY = 'mineral_season_data'
 
@@ -33,6 +35,7 @@ export const useSeasonStore = defineStore('season', () => {
   const settlementResult = ref(null)
   const showSeasonStartModal = ref(false)
   const lastSeenSeasonStart = ref('')
+  const rewardNotifications = ref([])
 
   const activeSeason = computed(() => getActiveSeason())
   const upcomingSeason = computed(() => getUpcomingSeason())
@@ -154,6 +157,63 @@ export const useSeasonStore = defineStore('season', () => {
     saveSeasonData()
   }
 
+  const pushRewardNotification = (type, label, value, emoji = '🎁') => {
+    const id = Date.now() + Math.random()
+    rewardNotifications.value.push({ id, type, label, value, emoji })
+    setTimeout(() => {
+      rewardNotifications.value = rewardNotifications.value.filter(n => n.id !== id)
+    }, 2500)
+  }
+
+  const distributeReward = (reward) => {
+    if (!reward) return []
+    const gameStore = useGameStore()
+    const gachaStore = useGachaStore()
+    const distributed = []
+
+    if (reward.coins && reward.coins > 0) {
+      gameStore.coins += reward.coins
+      distributed.push({ type: 'coins', label: '金币', value: reward.coins, emoji: '💰' })
+      pushRewardNotification('coins', '金币', reward.coins, '💰')
+    }
+
+    if (reward.items && reward.items.length > 0) {
+      for (const item of reward.items) {
+        if (item.type === 'stamina' && item.value > 0) {
+          gameStore.addStamina(item.value)
+          distributed.push({ type: 'stamina', label: '体力', value: item.value, emoji: '⚡' })
+          pushRewardNotification('stamina', '体力', item.value, '⚡')
+        }
+        if (item.type === 'gacha_ticket' && item.value > 0) {
+          gachaStore.addTicket(TICKET_TYPES.ADVANCED, item.value)
+          distributed.push({ type: 'gacha_ticket', label: '高级盲盒券', value: item.value, emoji: '🎫' })
+          pushRewardNotification('gacha_ticket', '高级盲盒券', item.value, '🎫')
+        }
+        if (item.type === 'season_specimen' && currentSeason.value) {
+          const specimen = currentSeason.value.limitedSpecimens[item.value]
+          if (specimen) {
+            const alreadyCollected = collectedSpecimens.value.includes(specimen.id)
+            if (!alreadyCollected) {
+              collectedSpecimens.value.push(specimen.id)
+              if (!gameStore.isMineralCollected(specimen.id)) {
+                gameStore.collectMineral(specimen)
+              }
+              distributed.push({ type: 'season_specimen', label: '限定标本', value: specimen.name, emoji: specimen.emoji })
+              pushRewardNotification('season_specimen', '限定标本', specimen.name, specimen.emoji)
+            } else {
+              distributed.push({ type: 'season_specimen_duplicate', label: `${specimen.name}(重复)`, value: '已收集', emoji: specimen.emoji })
+            }
+          }
+        }
+      }
+    }
+
+    gameStore.saveProgress()
+    gachaStore.saveProgress()
+    saveSeasonData()
+    return distributed
+  }
+
   const claimFreeReward = (tierIndex) => {
     if (tierIndex >= passLevel.value) return false
     if (freeClaimedTiers.value.includes(tierIndex)) return false
@@ -162,8 +222,9 @@ export const useSeasonStore = defineStore('season', () => {
     if (!tier || !tier.freeReward) return false
 
     freeClaimedTiers.value.push(tierIndex)
+    const distributed = distributeReward(tier.freeReward)
     saveSeasonData()
-    return tier.freeReward
+    return { reward: tier.freeReward, distributed }
   }
 
   const claimPremiumReward = (tierIndex) => {
@@ -175,25 +236,17 @@ export const useSeasonStore = defineStore('season', () => {
     if (!tier || !tier.premiumReward) return false
 
     premiumClaimedTiers.value.push(tierIndex)
-
-    const specimenItem = tier.premiumReward.items.find(item => item.type === 'season_specimen')
-    if (specimenItem && currentSeason.value) {
-      const specimen = currentSeason.value.limitedSpecimens[specimenItem.value]
-      if (specimen && !collectedSpecimens.value.includes(specimen.id)) {
-        collectedSpecimens.value.push(specimen.id)
-      }
-    }
-
+    const distributed = distributeReward(tier.premiumReward)
     saveSeasonData()
-    return tier.premiumReward
+    return { reward: tier.premiumReward, distributed }
   }
 
   const claimAllFree = () => {
     const rewards = []
     for (let i = 0; i < passLevel.value; i++) {
       if (!freeClaimedTiers.value.includes(i)) {
-        const reward = claimFreeReward(i)
-        if (reward) rewards.push({ tier: i, ...reward })
+        const result = claimFreeReward(i)
+        if (result) rewards.push({ tier: i, ...result })
       }
     }
     return rewards
@@ -204,8 +257,8 @@ export const useSeasonStore = defineStore('season', () => {
     const rewards = []
     for (let i = 0; i < passLevel.value; i++) {
       if (!premiumClaimedTiers.value.includes(i)) {
-        const reward = claimPremiumReward(i)
-        if (reward) rewards.push({ tier: i, ...reward })
+        const result = claimPremiumReward(i)
+        if (result) rewards.push({ tier: i, ...result })
       }
     }
     return rewards
@@ -243,6 +296,7 @@ export const useSeasonStore = defineStore('season', () => {
     if (result.rewards.coins > 0) {
       const gameStore = useGameStore()
       gameStore.coins += result.rewards.coins
+      pushRewardNotification('coins', '赛季结算金币', result.rewards.coins, '💰')
       gameStore.saveProgress()
     }
 
@@ -255,12 +309,20 @@ export const useSeasonStore = defineStore('season', () => {
     }
 
     if (result.specimenIds.length > 0 && currentSeason.value) {
+      const gameStore = useGameStore()
       result.specimenIds.forEach(id => {
         const specimen = currentSeason.value.limitedSpecimens.find(s => s.id === id)
-        if (specimen && !collectedSpecimens.value.includes(specimen.id)) {
-          collectedSpecimens.value.push(specimen.id)
+        if (specimen) {
+          if (!collectedSpecimens.value.includes(specimen.id)) {
+            collectedSpecimens.value.push(specimen.id)
+          }
+          if (!gameStore.isMineralCollected(specimen.id)) {
+            gameStore.collectMineral(specimen)
+          }
+          pushRewardNotification('season_specimen', '赛季限定标本', specimen.name, specimen.emoji)
         }
       })
+      gameStore.saveProgress()
     }
 
     settlementResult.value = result
@@ -362,6 +424,24 @@ export const useSeasonStore = defineStore('season', () => {
         currentSeasonId.value = activeSeason.value.id
       }
 
+      if (collectedSpecimens.value.length > 0) {
+        const gameStore = useGameStore()
+        collectedSpecimens.value.forEach(specimenId => {
+          let specimen = null
+          for (const season of SEASONS) {
+            const found = season.limitedSpecimens?.find(s => s.id === specimenId)
+            if (found) {
+              specimen = found
+              break
+            }
+          }
+          if (specimen && !gameStore.isMineralCollected(specimen.id)) {
+            gameStore.collectMineral(specimen)
+          }
+        })
+        gameStore.saveProgress()
+      }
+
       checkSeasonTransition()
     } catch (e) {
       console.error('Failed to load season data:', e)
@@ -399,6 +479,7 @@ export const useSeasonStore = defineStore('season', () => {
     showSettlementModal,
     settlementResult,
     showSeasonStartModal,
+    rewardNotifications,
     activeSeason,
     upcomingSeason,
     currentSeason,
@@ -425,6 +506,8 @@ export const useSeasonStore = defineStore('season', () => {
     closeSettlementModal,
     checkSeasonTransition,
     closeSeasonStartModal,
+    pushRewardNotification,
+    distributeReward,
     onExpeditionComplete,
     onMineralCollected,
     onCollageComplete,

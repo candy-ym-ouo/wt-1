@@ -272,6 +272,7 @@ import { useMarketStore } from '@/stores/market'
 import { useMuseumStore } from '@/stores/museum'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 import { getMineralById } from '@/data/minerals'
+import { SEASONS } from '@/data/season'
 import { getHallsByMineralId } from '@/data/halls'
 import RatingStars from '@/components/RatingStars.vue'
 import PopularityBadge from '@/components/PopularityBadge.vue'
@@ -283,9 +284,23 @@ const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const museumStore = useMuseumStore()
 
+const getAnyMineralById = (id) => {
+  const numericId = Number(id)
+  if (!Number.isNaN(numericId)) {
+    const m = getMineralById(numericId)
+    if (m) return m
+  }
+  for (const season of SEASONS) {
+    if (season.limitedSpecimens) {
+      const specimen = season.limitedSpecimens.find(s => s.id === id)
+      if (specimen) return specimen
+    }
+  }
+  return null
+}
+
 const mineral = computed(() => {
-  const id = parseInt(route.params.id)
-  return getMineralById(id)
+  return getAnyMineralById(route.params.id)
 })
 
 const isCollected = computed(() => {

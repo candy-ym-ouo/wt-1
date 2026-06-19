@@ -1,5 +1,20 @@
 <template>
   <div class="season-view">
+    <div class="reward-toasts">
+      <TransitionGroup name="toast">
+        <div
+          v-for="notification in seasonStore.rewardNotifications"
+          :key="notification.id"
+          class="reward-toast"
+          :class="`type-${notification.type}`"
+        >
+          <span class="toast-emoji">{{ notification.emoji }}</span>
+          <span class="toast-label">{{ notification.label }}</span>
+          <span class="toast-value">+{{ notification.value }}</span>
+        </div>
+      </TransitionGroup>
+    </div>
+
     <div class="season-hero" :style="{ background: season?.themeGradient }" v-if="season">
       <div class="hero-bg-effects">
         <span v-for="i in 6" :key="i" class="hero-shape" :style="getShapeStyle(i)"></span>
@@ -399,6 +414,101 @@ const handleActivatePremium = () => {
 </script>
 
 <style scoped>
+.reward-toasts {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.reward-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast-emoji {
+  font-size: 20px;
+}
+
+.toast-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.toast-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.reward-toast.type-season_specimen {
+  border-color: rgba(168, 85, 247, 0.4);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(139, 92, 246, 0.2));
+}
+
+.reward-toast.type-season_specimen .toast-value {
+  color: #c084fc;
+}
+
+.reward-toast.type-gacha_ticket {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.reward-toast.type-gacha_ticket .toast-value {
+  color: #f87171;
+}
+
+.reward-toast.type-stamina {
+  border-color: rgba(251, 146, 60, 0.3);
+}
+
+.reward-toast.type-stamina .toast-value {
+  color: #fb923c;
+}
+
+.toast-enter-active {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.8);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.9);
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .season-view {
   height: 100%;
   overflow-y: auto;

@@ -8,6 +8,7 @@ import {
   getRewardItemById
 } from '@/data/quiz'
 import { getRandomMineralByRarity, getRandomUncollectedMineralByRarity, getMineralsByRarity } from '@/data/minerals'
+import { RARITY_CONFIG } from '@/data/rarity'
 import { useGameStore } from './game'
 
 const STORAGE_KEY = 'mineral_quiz_progress'
@@ -264,7 +265,12 @@ export const useQuizStore = defineStore('quiz', () => {
         let mineral = getRandomUncollectedMineralByRarity(item.rarity, collectedIds)
         
         if (mineral) {
-          const isNew = gameStore.collectMineral(mineral)
+          const isNew = gameStore.collectMineral(mineral, 'quiz', {
+            type: 'reward_unlock',
+            rarity: item.rarity,
+            rarityName: RARITY_CONFIG[item.rarity]?.name,
+            cost: item.cost
+          })
           result.unlockedMineral = mineral
           result.isNewMineral = isNew
           if (isNew) {

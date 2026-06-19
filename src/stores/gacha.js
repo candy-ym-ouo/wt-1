@@ -165,7 +165,11 @@ export const useGachaStore = defineStore('gacha', () => {
     const gameStore = useGameStore()
 
     results.forEach(result => {
-      const isNew = gameStore.collectMineral(result.mineral)
+      const isNew = gameStore.collectMineral(result.mineral, 'gacha', {
+        boxType,
+        boxName: getBoxById(boxType)?.name,
+        isPity: result.isPity
+      })
       result.isNew = isNew
     })
 

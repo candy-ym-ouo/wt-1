@@ -245,7 +245,14 @@ export const useExchangeStore = defineStore('exchange', () => {
       return { success: false, message: '没有可兑换的目标矿物' }
     }
 
-    const isNew = gameStore.collectMineral(targetMineral)
+    const isNew = gameStore.collectMineral(targetMineral, 'exchange', {
+      type: 'rarity_conversion',
+      fromRarity,
+      fromRarityName: RARITY_CONFIG[fromRarity].name,
+      toRarity: config.targetRarity,
+      toRarityName: RARITY_CONFIG[config.targetRarity].name,
+      coinCost: config.coinCost
+    })
 
     const record = {
       id: Date.now(),

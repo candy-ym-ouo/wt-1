@@ -13,7 +13,8 @@ export const SOURCE_TYPES = {
   MARKET: 'market',
   EXCHANGE: 'exchange',
   GACHA: 'gacha',
-  SEASON: 'season'
+  SEASON: 'season',
+  QUIZ: 'quiz'
 }
 
 export const SOURCE_CONFIG = {
@@ -46,6 +47,11 @@ export const SOURCE_CONFIG = {
     name: '赛季',
     emoji: '🏆',
     color: '#ec4899'
+  },
+  [SOURCE_TYPES.QUIZ]: {
+    name: '问答',
+    emoji: '❓',
+    color: '#10b981'
   }
 }
 
@@ -116,12 +122,59 @@ export const useWarehouseStore = defineStore('warehouse', () => {
     const sources = []
     const sourceTypes = Object.values(SOURCE_TYPES)
     const locations = EXPEDITION_LOCATIONS.map(l => ({ id: l.id, name: l.name }))
+    const boxTypes = ['basic', 'advanced', 'legendary']
+    const boxNames = ['普通盲盒', '高级盲盒', '传说盲盒']
     
     for (let i = 0; i < mineral.count; i++) {
-      const sourceType = sourceTypes[Math.floor(Math.random() * 3)]
-      const sourceData = sourceType === SOURCE_TYPES.EXPEDITION 
-        ? { ...locations[Math.floor(Math.random() * locations.length)] }
-        : {}
+      const sourceType = sourceTypes[Math.floor(Math.random() * sourceTypes.length)]
+      let sourceData = {}
+      
+      switch (sourceType) {
+        case SOURCE_TYPES.EXPEDITION:
+          sourceData = { ...locations[Math.floor(Math.random() * locations.length)] }
+          break
+        case SOURCE_TYPES.GACHA:
+          const boxIndex = Math.floor(Math.random() * boxTypes.length)
+          sourceData = {
+            boxType: boxTypes[boxIndex],
+            boxName: boxNames[boxIndex],
+            isPity: Math.random() < 0.1
+          }
+          break
+        case SOURCE_TYPES.COLLAGE:
+          sourceData = {
+            timeTaken: Math.floor(Math.random() * 60) + 20
+          }
+          break
+        case SOURCE_TYPES.EXCHANGE:
+          sourceData = {
+            type: 'rarity_conversion',
+            fromRarity: mineral.rarity,
+            coinCost: Math.floor(Math.random() * 500) + 100
+          }
+          break
+        case SOURCE_TYPES.SEASON:
+          const season = SEASONS[Math.floor(Math.random() * SEASONS.length)]
+          sourceData = {
+            type: 'pass_reward',
+            seasonId: season?.id,
+            seasonName: season?.name,
+            tier: Math.floor(Math.random() * 50) + 1
+          }
+          break
+        case SOURCE_TYPES.QUIZ:
+          sourceData = {
+            type: 'reward_unlock',
+            rarity: mineral.rarity,
+            cost: Math.floor(Math.random() * 100) + 20
+          }
+          break
+        case SOURCE_TYPES.MARKET:
+          sourceData = {
+            price: Math.floor(Math.random() * 1000) + 100
+          }
+          break
+      }
       
       sources.push({
         source: sourceType,

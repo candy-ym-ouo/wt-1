@@ -196,7 +196,12 @@ export const useSeasonStore = defineStore('season', () => {
             if (!alreadyCollected) {
               collectedSpecimens.value.push(specimen.id)
               if (!gameStore.isMineralCollected(specimen.id)) {
-                gameStore.collectMineral(specimen)
+                gameStore.collectMineral(specimen, 'season', {
+                  type: 'pass_reward',
+                  seasonId: currentSeason.value.id,
+                  seasonName: currentSeason.value.name,
+                  tier: reward.tier
+                })
               }
               distributed.push({ type: 'season_specimen', label: '限定标本', value: specimen.name, emoji: specimen.emoji })
               pushRewardNotification('season_specimen', '限定标本', specimen.name, specimen.emoji)
@@ -317,7 +322,13 @@ export const useSeasonStore = defineStore('season', () => {
             collectedSpecimens.value.push(specimen.id)
           }
           if (!gameStore.isMineralCollected(specimen.id)) {
-            gameStore.collectMineral(specimen)
+            gameStore.collectMineral(specimen, 'season', {
+              type: 'ranking_reward',
+              seasonId: currentSeason.value.id,
+              seasonName: currentSeason.value.name,
+              rank: result.finalRank,
+              rankRange: result.rankRange
+            })
           }
           pushRewardNotification('season_specimen', '赛季限定标本', specimen.name, specimen.emoji)
         }
@@ -428,15 +439,21 @@ export const useSeasonStore = defineStore('season', () => {
         const gameStore = useGameStore()
         collectedSpecimens.value.forEach(specimenId => {
           let specimen = null
+          let seasonInfo = null
           for (const season of SEASONS) {
             const found = season.limitedSpecimens?.find(s => s.id === specimenId)
             if (found) {
               specimen = found
+              seasonInfo = { id: season.id, name: season.name }
               break
             }
           }
           if (specimen && !gameStore.isMineralCollected(specimen.id)) {
-            gameStore.collectMineral(specimen)
+            gameStore.collectMineral(specimen, 'season', {
+              type: 'data_migration',
+              seasonId: seasonInfo?.id,
+              seasonName: seasonInfo?.name
+            })
           }
         })
         gameStore.saveProgress()

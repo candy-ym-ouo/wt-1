@@ -68,6 +68,7 @@ const toggleSound = () => {
 }
 
 onMounted(() => {
+  audioStore.loadAudioSettings()
   gameStore.loadProgress()
 })
 </script>

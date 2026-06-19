@@ -408,7 +408,9 @@ const animate = () => {
 
 const startGame = () => {
   audioStore.playClick()
-  audioStore.startBackgroundMusic()
+  if (audioStore.soundEnabled && audioStore.musicEnabled) {
+    audioStore.startBackgroundMusic()
+  }
   gameStarted.value = true
   
   if (props.mineral && props.mineral.rarity === 'legendary') {

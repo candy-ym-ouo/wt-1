@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+
+const AUDIO_STORAGE_KEY = 'mineral_collage_audio_settings'
 
 export const useAudioStore = defineStore('audio', () => {
   const soundEnabled = ref(true)
@@ -9,6 +11,34 @@ export const useAudioStore = defineStore('audio', () => {
   const backgroundGain = ref(null)
   const musicVolume = ref(0.15)
   const sfxVolume = ref(0.3)
+
+  const saveAudioSettings = () => {
+    try {
+      localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify({
+        soundEnabled: soundEnabled.value,
+        musicEnabled: musicEnabled.value,
+        musicVolume: musicVolume.value,
+        sfxVolume: sfxVolume.value
+      }))
+    } catch (e) {
+      console.error('Failed to save audio settings:', e)
+    }
+  }
+
+  const loadAudioSettings = () => {
+    try {
+      const saved = localStorage.getItem(AUDIO_STORAGE_KEY)
+      if (saved) {
+        const settings = JSON.parse(saved)
+        soundEnabled.value = settings.soundEnabled ?? true
+        musicEnabled.value = settings.musicEnabled ?? true
+        musicVolume.value = settings.musicVolume ?? 0.15
+        sfxVolume.value = settings.sfxVolume ?? 0.3
+      }
+    } catch (e) {
+      console.error('Failed to load audio settings:', e)
+    }
+  }
 
   const initAudioContext = () => {
     if (!audioContext.value) {
@@ -85,20 +115,20 @@ export const useAudioStore = defineStore('audio', () => {
   }
 
   const startBackgroundMusic = () => {
-    if (!musicEnabled.value || !audioContext.value) return
+    if (!soundEnabled.value || !musicEnabled.value || !audioContext.value) return
     if (backgroundOscillator.value) return
 
     initAudioContext()
 
     const playNote = () => {
-      if (!musicEnabled.value || !audioContext.value) return
+      if (!soundEnabled.value || !musicEnabled.value || !audioContext.value) return
 
       const baseNotes = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25]
       const melody = [0, 2, 4, 5, 4, 2, 0, 2, 4, 7, 5, 4, 2, 0, 2, 4]
       let noteIndex = 0
 
       const playNextNote = () => {
-        if (!musicEnabled.value || !audioContext.value) return
+        if (!soundEnabled.value || !musicEnabled.value || !audioContext.value) return
 
         const note = baseNotes[melody[noteIndex % melody.length]]
         const osc = audioContext.value.createOscillator()
@@ -159,6 +189,7 @@ export const useAudioStore = defineStore('audio', () => {
     } else if (musicEnabled.value) {
       startBackgroundMusic()
     }
+    saveAudioSettings()
   }
 
   const toggleMusic = () => {
@@ -169,6 +200,7 @@ export const useAudioStore = defineStore('audio', () => {
     } else {
       stopBackgroundMusic()
     }
+    saveAudioSettings()
   }
 
   const setMusicVolume = (volume) => {
@@ -176,10 +208,12 @@ export const useAudioStore = defineStore('audio', () => {
     if (backgroundGain.value) {
       backgroundGain.value.gain.setValueAtTime(musicVolume.value * 0.5, audioContext.value.currentTime)
     }
+    saveAudioSettings()
   }
 
   const setSfxVolume = (volume) => {
     sfxVolume.value = Math.max(0, Math.min(1, volume))
+    saveAudioSettings()
   }
 
   return {
@@ -188,6 +222,8 @@ export const useAudioStore = defineStore('audio', () => {
     musicVolume,
     sfxVolume,
     initAudioContext,
+    loadAudioSettings,
+    saveAudioSettings,
     playTone,
     playSuccess,
     playClick,

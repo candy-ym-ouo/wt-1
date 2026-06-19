@@ -23,9 +23,16 @@ export const useMuseumStore = defineStore('museum', () => {
 
   const museumStats = computed(() => {
     const totalMineralViews = Object.values(mineralViews.value).reduce((a, b) => a + b, 0)
-    const totalRatings = Object.keys(mineralRatings.value).length
-    const avgRating = totalRatings > 0
-      ? (Object.values(mineralRatings.value).reduce((a, b) => a + b.average, 0) / totalRatings).toFixed(1)
+    
+    let totalRatingCount = 0
+    let weightedRatingSum = 0
+    Object.values(mineralRatings.value).forEach(rating => {
+      totalRatingCount += rating.count
+      weightedRatingSum += rating.average * rating.count
+    })
+    
+    const avgRating = totalRatingCount > 0
+      ? Number((weightedRatingSum / totalRatingCount).toFixed(1))
       : 0
 
     return {
@@ -35,7 +42,7 @@ export const useMuseumStore = defineStore('museum', () => {
       totalHalls: HALLS.length,
       totalExhibitions: EXHIBITIONS.length,
       totalMineralViews,
-      totalRatings,
+      totalRatings: totalRatingCount,
       avgRating,
       favoriteCount: favoriteMinerals.value.length
     }
@@ -44,17 +51,28 @@ export const useMuseumStore = defineStore('museum', () => {
   const getMineralRating = (mineralId) => {
     if (!mineralRatings.value[mineralId]) {
       const rarityStars = RARITY_CONFIG[getMineralById(mineralId)?.rarity]?.starCount || 3
-      const baseRating = 3 + rarityStars * 0.3
+      const baseRating = Number((3 + rarityStars * 0.3).toFixed(1))
+      
+      const dist = {
+        1: Math.floor(Math.random() * 5),
+        2: Math.floor(Math.random() * 10),
+        3: Math.floor(Math.random() * 30),
+        4: Math.floor(Math.random() * 60),
+        5: Math.floor(Math.random() * 100)
+      }
+      
+      const count = dist[1] + dist[2] + dist[3] + dist[4] + dist[5]
+      
+      let total = 0
+      for (let i = 1; i <= 5; i++) {
+        total += i * dist[i]
+      }
+      const average = Number((total / count).toFixed(1))
+      
       mineralRatings.value[mineralId] = {
-        average: baseRating,
-        count: Math.floor(Math.random() * 200) + 50,
-        distribution: {
-          1: Math.floor(Math.random() * 5),
-          2: Math.floor(Math.random() * 10),
-          3: Math.floor(Math.random() * 30),
-          4: Math.floor(Math.random() * 60),
-          5: Math.floor(Math.random() * 100)
-        }
+        average,
+        count,
+        distribution: dist
       }
     }
     return mineralRatings.value[mineralId]
@@ -108,14 +126,13 @@ export const useMuseumStore = defineStore('museum', () => {
   }
 
   const rateMineral = (mineralId, rating) => {
-    userRatings.value[mineralId] = rating
+    const oldRating = userRatings.value[mineralId] || 0
 
     if (!mineralRatings.value[mineralId]) {
       getMineralRating(mineralId)
     }
 
     const data = mineralRatings.value[mineralId]
-    const oldRating = userRatings.value[mineralId]
 
     if (oldRating > 0 && data.distribution[oldRating] > 0) {
       data.distribution[oldRating]--
@@ -132,6 +149,8 @@ export const useMuseumStore = defineStore('museum', () => {
       count += data.distribution[i] || 0
     }
     data.average = count > 0 ? Number((total / count).toFixed(1)) : 0
+
+    userRatings.value[mineralId] = rating
 
     saveData()
     return data
@@ -212,6 +231,39 @@ export const useMuseumStore = defineStore('museum', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }
 
+  const validateAndFixRatingData = () => {
+    Object.keys(mineralRatings.value).forEach(mineralId => {
+      const rating = mineralRatings.value[mineralId]
+      
+      if (!rating.distribution) {
+        rating.distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      }
+      
+      let distSum = 0
+      let weightedSum = 0
+      for (let i = 1; i <= 5; i++) {
+        const count = rating.distribution[i] || 0
+        distSum += count
+        weightedSum += i * count
+      }
+      
+      if (rating.count !== distSum) {
+        rating.count = distSum
+      }
+      
+      if (distSum > 0) {
+        const calculatedAvg = Number((weightedSum / distSum).toFixed(1))
+        if (Math.abs(rating.average - calculatedAvg) > 0.1) {
+          rating.average = calculatedAvg
+        }
+      }
+      
+      if (!rating.average || rating.average < 0 || rating.average > 5) {
+        rating.average = distSum > 0 ? Number((weightedSum / distSum).toFixed(1)) : 0
+      }
+    })
+  }
+
   const loadData = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -223,6 +275,8 @@ export const useMuseumStore = defineStore('museum', () => {
         exhibitionVisits.value = data.exhibitionVisits || {}
         userRatings.value = data.userRatings || {}
         favoriteMinerals.value = data.favoriteMinerals || []
+        
+        validateAndFixRatingData()
       }
     } catch (e) {
       console.error('Failed to load museum data:', e)

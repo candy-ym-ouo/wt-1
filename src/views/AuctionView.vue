@@ -153,9 +153,10 @@
           <div class="bidding-header">
             <h3 class="section-title">💰 我的出价</h3>
             <div class="bidding-status">
-              <span v-if="!auctionStore.canPlayerBid && (auctionStore.phase === 'bidding' || auctionStore.phase === 'closing')" class="status-warning">金币不足</span>
-              <span v-else-if="auctionStore.phase === 'preview'" class="status-info">预览阶段，即将开始竞价</span>
+              <span v-if="auctionStore.phase === 'preview'" class="status-info">预览阶段，即将开始竞价</span>
               <span v-else-if="auctionStore.phase === 'result'" class="status-success">本轮结束</span>
+              <span v-else-if="auctionStore.playerLeading" class="status-success">✓ 暂时领先</span>
+              <span v-else-if="!auctionStore.canPlayerBid" class="status-warning">金币不足</span>
             </div>
           </div>
           <div class="quick-bid-buttons">

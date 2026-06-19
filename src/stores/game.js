@@ -165,7 +165,7 @@ export const useGameStore = defineStore('game', () => {
     return collectedMinerals.value.some(m => m.id === mineralId)
   }
 
-  const collectMineral = (mineral, source = 'collage', sourceData = {}, rewards = {}, keyEvents = []) => {
+  const collectMineral = (mineral, source = 'collage', sourceData = {}, rewards = {}, keyEvents = [], options = {}) => {
     const detectorStore = useDetectorStore()
     
     const sourceRecord = {
@@ -179,6 +179,8 @@ export const useGameStore = defineStore('game', () => {
     let extraCoins = rewards.coins || 0
     let extraExp = rewards.exp || 0
     let dropCount = 1
+    const skipCoinReward = options.skipCoinReward || false
+    const fixedCount = options.fixedCount || null
     
     if (!isMineralCollected(mineral.id)) {
       collectedMinerals.value.push({
@@ -189,11 +191,19 @@ export const useGameStore = defineStore('game', () => {
       })
       emitTaskEvent('mineralCollected', mineral)
       
-      const baseCoins = RARITY_CONFIG[mineral.rarity].starCount * 10
-      const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
-      coins.value += bonusCoins
-      earnedCoins = bonusCoins + extraCoins
-      emitTaskEvent('coinsEarned', bonusCoins)
+      if (!skipCoinReward) {
+        const baseCoins = RARITY_CONFIG[mineral.rarity].starCount * 10
+        const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
+        coins.value += bonusCoins
+        earnedCoins = bonusCoins + extraCoins
+        emitTaskEvent('coinsEarned', bonusCoins)
+      } else {
+        earnedCoins = extraCoins
+        if (extraCoins > 0) {
+          coins.value += extraCoins
+          emitTaskEvent('coinsEarned', extraCoins)
+        }
+      }
       
       isNew = true
       const events = ['首次发现！', ...keyEvents]
@@ -208,7 +218,11 @@ export const useGameStore = defineStore('game', () => {
     } else {
       const existing = collectedMinerals.value.find(m => m.id === mineral.id)
       
-      dropCount = detectorStore.rollMultiDropCount()
+      if (fixedCount !== null) {
+        dropCount = fixedCount
+      } else {
+        dropCount = detectorStore.rollMultiDropCount()
+      }
       existing.count += dropCount
       
       if (!existing.sources) {
@@ -221,13 +235,21 @@ export const useGameStore = defineStore('game', () => {
         })
       }
       
-      const baseCoins = 10 * dropCount
-      const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
-      coins.value += bonusCoins
-      earnedCoins = bonusCoins + extraCoins
+      if (!skipCoinReward) {
+        const baseCoins = 10 * dropCount
+        const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
+        coins.value += bonusCoins
+        earnedCoins = bonusCoins + extraCoins
+        emitTaskEvent('coinsEarned', bonusCoins)
+      } else {
+        earnedCoins = extraCoins
+        if (extraCoins > 0) {
+          coins.value += extraCoins
+          emitTaskEvent('coinsEarned', extraCoins)
+        }
+      }
       
       emitTaskEvent('mineralCollected', mineral)
-      emitTaskEvent('coinsEarned', bonusCoins)
       
       const events = dropCount > 1 ? [`多重掉落 x${dropCount}！`, ...keyEvents] : keyEvents
       addDiscoveryLog(mineral, source, sourceData, {

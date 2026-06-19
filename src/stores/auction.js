@@ -81,6 +81,7 @@ export const useAuctionStore = defineStore('auction', () => {
   const canPlayerBid = computed(() => {
     if (phase.value !== AUCTION_PHASE.BIDDING && phase.value !== AUCTION_PHASE.CLOSING) return false
     if (!currentRound.value) return false
+    if (currentBidder.value?.id === 'player') return false
     return gameStore.coins >= nextMinBid.value
   })
 
@@ -285,6 +286,10 @@ export const useAuctionStore = defineStore('auction', () => {
       return { success: false, message: '无法出价' }
     }
 
+    if (currentBidder.value?.id === 'player') {
+      return { success: false, message: '你已经是最高出价者' }
+    }
+
     if (amount < nextMinBid.value) {
       return { success: false, message: `出价至少需要 ${nextMinBid.value.toLocaleString()} 金币` }
     }
@@ -432,8 +437,11 @@ export const useAuctionStore = defineStore('auction', () => {
   const handlePlayerWin = () => {
     const round = currentRound.value
     if (!round) return
+    if (currentBidder.value?.id !== 'player') return
 
     const finalPrice = currentBid.value
+    if (finalPrice <= 0) return
+    if (gameStore.coins < finalPrice) return
 
     gameStore.coins -= finalPrice
     totalWins.value++
@@ -446,7 +454,16 @@ export const useAuctionStore = defineStore('auction', () => {
     }, {
       coins: 0,
       exp: RARITY_CONFIG[round.mineral.rarity].starCount * 10
-    }, ['拍卖竞得！'])
+    }, ['拍卖竞得！'], {
+      skipCoinReward: true,
+      fixedCount: 1
+    })
+
+    gameStore.emitTaskEvent('marketTransaction', {
+      type: 'auction_buy',
+      mineralId: round.mineralId,
+      price: finalPrice
+    })
 
     gameStore.saveProgress()
   }

@@ -3,6 +3,11 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
+    name: 'Museum',
+    component: () => import('@/views/MuseumView.vue')
+  },
+  {
+    path: '/showcase',
     name: 'Showcase',
     component: () => import('@/views/ShowcaseView.vue')
   },

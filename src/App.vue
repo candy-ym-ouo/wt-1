@@ -3,8 +3,8 @@
     <header class="app-header">
       <div class="header-content">
         <div class="logo">
-          <span class="logo-icon">💎</span>
-          <span class="logo-text">矿物标本拼贴</span>
+          <span class="logo-icon">🏛️</span>
+          <span class="logo-text">矿物博物馆</span>
         </div>
         <div class="header-stats">
           <div class="stat-item">
@@ -61,6 +61,7 @@ import { useAudioStore } from './stores/audio'
 import { useMarketStore } from './stores/market'
 import { useTaskStore } from './stores/task'
 import { useGachaStore } from './stores/gacha'
+import { useMuseumStore } from './stores/museum'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -69,9 +70,11 @@ const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const taskStore = useTaskStore()
 const gachaStore = useGachaStore()
+const museumStore = useMuseumStore()
 
 const navItems = [
-  { path: '/', icon: '🏠', label: '展柜' },
+  { path: '/', icon: '�️', label: '博物馆' },
+  { path: '/showcase', icon: '📦', label: '展柜' },
   { path: '/expedition', icon: '🗺️', label: '远征' },
   { path: '/collage', icon: '🎨', label: '拼装' },
   { path: '/collection', icon: '📖', label: '图鉴' },
@@ -101,6 +104,7 @@ onMounted(() => {
   marketStore.loadMarketData()
   taskStore.loadTaskData()
   gachaStore.loadProgress()
+  museumStore.loadData()
 
   gameStore.onTaskEvent = (eventName, payload) => {
     switch (eventName) {
@@ -272,12 +276,14 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 20px;
+  gap: 2px;
+  padding: 6px 10px;
   border-radius: 12px;
   color: var(--text-secondary);
   transition: all 0.3s ease;
   position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .nav-item.active {
@@ -286,12 +292,16 @@ onUnmounted(() => {
 }
 
 .nav-icon {
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .nav-label {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .nav-badge {
@@ -326,8 +336,12 @@ onUnmounted(() => {
     font-size: 12px;
   }
   
-  .nav-item {
-    padding: 8px 16px;
+  .nav-icon {
+    font-size: 18px;
+  }
+
+  .nav-label {
+    font-size: 9px;
   }
 }
 </style>

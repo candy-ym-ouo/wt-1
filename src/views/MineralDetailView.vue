@@ -5,6 +5,14 @@
         ← 返回
       </button>
       <div class="header-actions">
+        <button 
+          class="fav-btn" 
+          :class="{ active: isFav }"
+          @click="toggleFav"
+          v-if="mineral"
+        >
+          {{ isFav ? '❤️' : '🤍' }}
+        </button>
         <span class="collected-badge" v-if="isCollected">
           ✓ 已收集
         </span>
@@ -27,9 +35,27 @@
           <h1 class="mineral-name">{{ mineral.name }}</h1>
           <span class="mineral-en">{{ mineral.nameEn }}</span>
         </div>
-        <div class="rarity-badge-large">
-          <span class="stars">{{ getRarityStars(mineral.rarity) }}</span>
-          <span class="rarity-name">{{ rarityConfig.name }}</span>
+        <div class="hero-badges">
+          <div class="rarity-badge-large">
+            <span class="stars">{{ getRarityStars(mineral.rarity) }}</span>
+            <span class="rarity-name">{{ rarityConfig.name }}</span>
+          </div>
+          <PopularityBadge v-if="mineral" :mineral-id="mineral.id" />
+        </div>
+        <div class="hero-meta-row">
+          <div class="meta-item">
+            <span class="meta-icon">👁️</span>
+            <span class="meta-value">{{ formatNumber(mineralViews) }}</span>
+            <span class="meta-label">浏览</span>
+          </div>
+          <div class="meta-item">
+            <RatingStars 
+              :model-value="mineralRating.average" 
+              :show-value="true"
+              :show-count="true"
+              :total-count="mineralRating.count"
+            />
+          </div>
         </div>
       </div>
 
@@ -53,6 +79,66 @@
           <span class="stat-icon">🔄</span>
           <span class="stat-label">收集次数</span>
           <span class="stat-value">{{ collectedData.count }}次</span>
+        </div>
+      </div>
+
+      <div class="rating-section card">
+        <h2 class="section-title">
+          <span class="title-icon">⭐</span>
+          藏品评分
+        </h2>
+        <div class="rating-content">
+          <div class="rating-summary">
+            <div class="rating-average">
+              <span class="average-num">{{ mineralRating.average.toFixed(1) }}</span>
+              <RatingStars :model-value="mineralRating.average" :show-value="false" />
+            </div>
+            <div class="rating-distribution">
+              <div v-for="star in 5" :key="star" class="dist-row">
+                <span class="dist-label">{{ 6 - star }}星</span>
+                <div class="dist-bar">
+                  <div 
+                    class="dist-fill" 
+                    :style="{ width: getDistPercent(6 - star) + '%' }"
+                  ></div>
+                </div>
+                <span class="dist-count">{{ getDistCount(6 - star) }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="user-rating">
+            <div class="user-rating-label">
+              你的评分：
+              <span v-if="userRating > 0" class="rated-text">已评 {{ userRating }} 星</span>
+              <span v-else class="rate-hint">点击星星为它打分</span>
+            </div>
+            <RatingStars 
+              :model-value="userRating" 
+              :interactive="true"
+              :show-value="false"
+              :show-count="false"
+              size="large"
+              @change="handleRate"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="halls-section card" v-if="relatedHalls.length > 0">
+        <h2 class="section-title">
+          <span class="title-icon">🏛️</span>
+          所在展厅
+        </h2>
+        <div class="halls-tags">
+          <div 
+            v-for="hall in relatedHalls" 
+            :key="hall.id"
+            class="hall-tag"
+            :style="{ background: hall.bgGradient, borderColor: hall.color }"
+          >
+            <span class="hall-tag-icon">{{ hall.icon }}</span>
+            <span class="hall-tag-name">{{ hall.name }}</span>
+          </div>
         </div>
       </div>
 
@@ -175,14 +261,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
+import { useMuseumStore } from '@/stores/museum'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 import { getMineralById } from '@/data/minerals'
+import { getHallsByMineralId } from '@/data/halls'
+import RatingStars from '@/components/RatingStars.vue'
+import PopularityBadge from '@/components/PopularityBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const marketStore = useMarketStore()
+const museumStore = useMuseumStore()
 
 const mineral = computed(() => {
   const id = parseInt(route.params.id)
@@ -201,6 +292,59 @@ const collectedData = computed(() => {
 const rarityConfig = computed(() => {
   return mineral.value ? RARITY_CONFIG[mineral.value.rarity] : null
 })
+
+const mineralRating = computed(() => {
+  if (!mineral.value) return { average: 0, count: 0, distribution: {} }
+  return museumStore.getMineralRating(mineral.value.id)
+})
+
+const mineralViews = computed(() => {
+  if (!mineral.value) return 0
+  return museumStore.getMineralViews(mineral.value.id)
+})
+
+const userRating = computed(() => {
+  if (!mineral.value) return 0
+  return museumStore.getUserRating(mineral.value.id)
+})
+
+const isFav = computed(() => {
+  if (!mineral.value) return false
+  return museumStore.isFavorite(mineral.value.id)
+})
+
+const relatedHalls = computed(() => {
+  if (!mineral.value) return []
+  return getHallsByMineralId(mineral.value.id)
+})
+
+const getDistCount = (star) => {
+  return mineralRating.value.distribution?.[star] || 0
+}
+
+const getDistPercent = (star) => {
+  const count = getDistCount(star)
+  const total = mineralRating.value.count || 1
+  return Math.round((count / total) * 100)
+}
+
+const formatNumber = (num) => {
+  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
+  return num.toString()
+}
+
+const handleRate = (rating) => {
+  if (!mineral.value) return
+  audioStore.playClick()
+  museumStore.rateMineral(mineral.value.id, rating)
+}
+
+const toggleFav = () => {
+  if (!mineral.value) return
+  audioStore.playClick()
+  museumStore.toggleFavorite(mineral.value.id)
+}
 
 const getShapeStyle = (index) => {
   const angle = (index / 6) * 360
@@ -280,7 +424,9 @@ const listMineral = () => {
 onMounted(() => {
   if (!mineral.value) {
     router.replace('/collection')
+    return
   }
+  museumStore.recordMineralView(mineral.value.id)
 })
 </script>
 
@@ -686,6 +832,233 @@ onMounted(() => {
   
   .stat-value {
     font-size: 14px;
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fav-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-card);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fav-btn:hover {
+  transform: scale(1.1);
+}
+
+.fav-btn.active {
+  background: rgba(239, 68, 68, 0.2);
+  animation: heartBeat 0.5s ease;
+}
+
+@keyframes heartBeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.hero-badges {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.hero-meta-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  margin-top: 8px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 14px;
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+}
+
+.meta-icon {
+  font-size: 16px;
+}
+
+.meta-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.meta-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rating-section,
+.halls-section {
+  margin: 0 16px 16px 16px;
+  padding: 20px;
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rating-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rating-summary {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.rating-average {
+  text-align: center;
+}
+
+.average-num {
+  display: block;
+  font-size: 36px;
+  font-weight: 800;
+  color: #fbbf24;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.rating-distribution {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dist-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.dist-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dist-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.dist-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.user-rating {
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.user-rating-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  display: block;
+}
+
+.rated-text {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.rate-hint {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.halls-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hall-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hall-tag:hover {
+  transform: translateY(-2px);
+}
+
+.hall-tag-icon {
+  font-size: 18px;
+}
+
+.hall-tag-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+@media (max-width: 480px) {
+  .rating-summary {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .hero-meta-row {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    padding: 6px 10px;
   }
 }
 </style>

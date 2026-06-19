@@ -86,6 +86,23 @@ export const useMarketStore = defineStore('market', () => {
     return { trend, change: Math.round(change * 10) / 10 }
   }
 
+  const addMineralToPlayer = (mineralId) => {
+    const mineral = getMineralById(mineralId)
+    if (!mineral) return false
+    
+    const existing = gameStore.collectedMinerals.find(m => m.id === mineralId)
+    if (existing) {
+      existing.count++
+    } else {
+      gameStore.collectedMinerals.push({
+        ...mineral,
+        collectedAt: Date.now(),
+        count: 1
+      })
+    }
+    return true
+  }
+  
   const createListing = (mineralId, startPrice, duration = AUCTION_DURATION) => {
     const mineral = getMineralById(mineralId)
     if (!mineral) return null
@@ -127,11 +144,13 @@ export const useMarketStore = defineStore('market', () => {
 
   const placeBid = (listingId, bidAmount) => {
     const listing = listings.value.find(l => l.id === listingId)
-    if (!listing || listing.status !== 'active') return { success: false, message: '拍卖已结束' }
+    if (!listing) return { success: false, message: '拍卖不存在' }
     
-    if (Date.now() >= listing.endTime) {
-      listing.status = 'ended'
+    if (listing.status === 'active' && Date.now() >= listing.endTime) {
       checkAuctionEnd(listing)
+    }
+    
+    if (listing.status !== 'active') {
       return { success: false, message: '拍卖已结束' }
     }
     
@@ -164,40 +183,45 @@ export const useMarketStore = defineStore('market', () => {
     
     listing.currentPrice = bidAmount
     saveMarketData()
+    gameStore.saveProgress()
     
     return { success: true, message: '出价成功' }
   }
 
   const checkAuctionEnd = (listing) => {
-    if (listing.status !== 'active') return
+    if (!listing || listing.status !== 'active') return false
     
-    if (Date.now() >= listing.endTime) {
-      listing.status = 'ended'
+    if (Date.now() < listing.endTime) return false
+    
+    listing.status = 'ended'
+    
+    if (listing.bids && listing.bids.length > 0) {
+      const winningBid = listing.bids.reduce((max, bid) => 
+        bid.amount > max.amount ? bid : max, listing.bids[0]
+      )
+      listing.winner = winningBid
       
-      if (listing.bids && listing.bids.length > 0) {
-        const winningBid = listing.bids.reduce((max, bid) => 
-          bid.amount > max.amount ? bid : max, listing.bids[0]
-        )
-        listing.winner = winningBid
-        
-        if (winningBid.bidderId === 'player') {
-          gameStore.coins -= winningBid.amount
-          gameStore.collectMineral(getMineralById(listing.mineralId))
-        } else if (listing.sellerId === 'player') {
-          gameStore.coins += Math.round(winningBid.amount * 0.95)
-        }
-        
-        recordTransaction(listing, winningBid)
-        updatePriceHistory(listing.mineralId, winningBid.amount)
-      } else {
-        if (listing.sellerId === 'player') {
-          gameStore.collectMineral(getMineralById(listing.mineralId))
-        }
+      if (winningBid.bidderId === 'player') {
+        gameStore.coins -= winningBid.amount
+        addMineralToPlayer(listing.mineralId)
       }
       
-      saveMarketData()
-      gameStore.saveProgress()
+      if (listing.sellerId === 'player') {
+        gameStore.coins += Math.round(winningBid.amount * 0.95)
+      }
+      
+      recordTransaction(listing, winningBid)
+      updatePriceHistory(listing.mineralId, winningBid.amount)
+    } else {
+      if (listing.sellerId === 'player') {
+        addMineralToPlayer(listing.mineralId)
+      }
     }
+    
+    saveMarketData()
+    gameStore.saveProgress()
+    
+    return true
   }
 
   const recordTransaction = (listing, winningBid) => {
@@ -232,7 +256,7 @@ export const useMarketStore = defineStore('market', () => {
       priceHistory.value[mineralId] = priceHistory.value[mineralId].slice(-50)
     }
   }
-
+  
   const cancelListing = (listingId) => {
     const listing = listings.value.find(l => l.id === listingId)
     if (!listing || listing.status !== 'active') return false
@@ -240,7 +264,7 @@ export const useMarketStore = defineStore('market', () => {
     if (listing.bids && listing.bids.length > 0) return false
     
     listing.status = 'cancelled'
-    gameStore.collectMineral(getMineralById(listing.mineralId))
+    addMineralToPlayer(listing.mineralId)
     saveMarketData()
     gameStore.saveProgress()
     

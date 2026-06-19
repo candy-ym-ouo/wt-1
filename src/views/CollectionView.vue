@@ -67,6 +67,99 @@
         </div>
       </div>
 
+      <div class="search-section">
+        <div class="search-box" :class="{ focused: showQuickJump }">
+          <span class="search-icon">🔍</span>
+          <input
+            v-model="searchKeyword"
+            type="text"
+            class="search-input"
+            placeholder="搜索矿物名 / 英文名 / 化学式...（按回车快速跳转）"
+            @focus="showQuickJump = true"
+            @blur="setTimeout(() => showQuickJump = false, 200)"
+            @keydown="handleQuickJumpKeydown"
+          />
+          <kbd v-if="!searchKeyword" class="search-hint">⌘K</kbd>
+          <div v-if="showQuickJump && quickJumpCandidates.length > 0" class="quick-jump-dropdown">
+            <div class="quick-jump-title">⚡ 快速跳转</div>
+            <div
+              v-for="mineral in quickJumpCandidates"
+              :key="mineral.id"
+              class="quick-jump-item"
+              :class="{ collected: isMineralCollected(mineral.id) }"
+              @mousedown.prevent="doQuickJump(mineral)"
+            >
+              <span class="qj-emoji">{{ isMineralCollected(mineral.id) ? mineral.emoji : '❓' }}</span>
+              <div class="qj-info">
+                <span class="qj-name">{{ isMineralCollected(mineral.id) ? mineral.name : '???' }}</span>
+                <span class="qj-sub">{{ isMineralCollected(mineral.id) ? `${mineral.nameEn} · ${mineral.formula}` : '未收集' }}</span>
+              </div>
+              <span :class="['qj-rarity', `rarity-${mineral.rarity}`]">{{ RARITY_CONFIG[mineral.rarity].name }}</span>
+              <span class="qj-arrow">→</span>
+            </div>
+          </div>
+        </div>
+        <button
+          :class="['advanced-filter-toggle', { active: showAdvancedFilters, 'has-active': hasActiveAdvancedFilters }]"
+          @click="showAdvancedFilters = !showAdvancedFilters"
+        >
+          <span class="af-icon">🎯</span>
+          <span>高级筛选</span>
+          <span v-if="hasActiveAdvancedFilters" class="af-badge">●</span>
+        </button>
+      </div>
+
+      <Transition name="slide-down">
+        <div v-if="showAdvancedFilters" class="advanced-filters-panel">
+          <div class="af-row">
+            <div class="af-group">
+              <label class="af-label">🌍 产地筛选</label>
+              <select class="af-select" :value="advancedFilters.origin" @change="setOriginFilter($event.target.value)">
+                <option v-for="f in ORIGIN_FILTERS" :key="f.value" :value="f.value">{{ f.label }}</option>
+              </select>
+            </div>
+            <div class="af-group">
+              <label class="af-label">⚒️ 用途筛选</label>
+              <select class="af-select" :value="advancedFilters.use" @change="setUseFilter($event.target.value)">
+                <option v-for="f in USE_FILTERS" :key="f.value" :value="f.value">{{ f.label }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="af-row">
+            <div class="af-group">
+              <label class="af-label">💎 硬度等级</label>
+              <div class="af-chips">
+                <button
+                  v-for="f in HARDNESS_FILTERS"
+                  :key="f.value"
+                  :class="['af-chip', { active: advancedFilters.hardness === f.value }]"
+                  @click="setHardnessFilter(f.value)"
+                >{{ f.label }}</button>
+              </div>
+            </div>
+            <div class="af-group">
+              <label class="af-label">📦 收集次数</label>
+              <div class="af-chips">
+                <button
+                  v-for="f in COLLECTION_COUNT_FILTERS"
+                  :key="f.value"
+                  :class="['af-chip', { active: advancedFilters.count === f.value }]"
+                  @click="setCountFilter(f.value)"
+                >{{ f.label }}</button>
+              </div>
+            </div>
+          </div>
+          <div class="af-actions">
+            <button class="btn btn-small btn-reset-af" @click="resetAdvancedFilters">
+              ↺ 重置筛选
+            </button>
+            <span class="af-result-count">
+              匹配 <strong>{{ filteredMinerals.length }}</strong> / {{ ALL_MINERALS_WITH_SEASON.length }} 种矿物
+            </span>
+          </div>
+        </div>
+      </Transition>
+
       <div class="filter-section">
         <div class="filter-tabs">
           <button 
@@ -81,13 +174,13 @@
         <div class="view-toggle">
           <button 
             :class="['toggle-btn', { active: viewMode === 'grid' }]"
-            @click="viewMode = 'grid'"
+            @click="updateViewMode('grid')"
           >
             网格
           </button>
           <button 
             :class="['toggle-btn', { active: viewMode === 'list' }]"
-            @click="viewMode = 'list'"
+            @click="updateViewMode('list')"
           >
             列表
           </button>
@@ -561,7 +654,14 @@ import { useSeasonStore } from '@/stores/season'
 import { useDetectorStore } from '@/stores/detector'
 import { useResearchStore } from '@/stores/research'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
-import { MINERALS } from '@/data/minerals'
+import { 
+  MINERALS, 
+  ORIGIN_FILTERS, 
+  USE_FILTERS, 
+  HARDNESS_FILTERS, 
+  COLLECTION_COUNT_FILTERS,
+  parseHardness
+} from '@/data/minerals'
 import { SEASONS } from '@/data/season'
 import { getKnowledgeCardsByMineralId } from '@/data/research'
 import { 
@@ -663,8 +763,81 @@ const ALL_MINERALS_WITH_SEASON = computed(() => {
   return [...MINERALS, ...getSeasonLimitedMinerals()]
 })
 
+const VIEW_MODE_KEY = 'collection_view_mode'
+const ADVANCED_FILTERS_KEY = 'collection_advanced_filters'
+
+const loadSavedViewMode = () => {
+  try {
+    const saved = localStorage.getItem(VIEW_MODE_KEY)
+    return saved === 'list' ? 'list' : 'grid'
+  } catch {
+    return 'grid'
+  }
+}
+
+const loadSavedAdvancedFilters = () => {
+  try {
+    const saved = localStorage.getItem(ADVANCED_FILTERS_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch {}
+  return {
+    origin: 'all',
+    use: 'all',
+    hardness: 'all',
+    count: 'all'
+  }
+}
+
 const activeFilter = ref('all')
-const viewMode = ref('grid')
+const viewMode = ref(loadSavedViewMode())
+const showAdvancedFilters = ref(false)
+const searchKeyword = ref('')
+const showQuickJump = ref(false)
+const quickJumpTarget = ref(null)
+
+const advancedFilters = ref(loadSavedAdvancedFilters())
+
+const updateViewMode = (mode) => {
+  viewMode.value = mode
+  try {
+    localStorage.setItem(VIEW_MODE_KEY, mode)
+  } catch {}
+}
+
+const persistAdvancedFilters = () => {
+  try {
+    localStorage.setItem(ADVANCED_FILTERS_KEY, JSON.stringify(advancedFilters.value))
+  } catch {}
+}
+
+const resetAdvancedFilters = () => {
+  advancedFilters.value = {
+    origin: 'all',
+    use: 'all',
+    hardness: 'all',
+    count: 'all'
+  }
+  persistAdvancedFilters()
+}
+
+const setOriginFilter = (val) => {
+  advancedFilters.value.origin = val
+  persistAdvancedFilters()
+}
+const setUseFilter = (val) => {
+  advancedFilters.value.use = val
+  persistAdvancedFilters()
+}
+const setHardnessFilter = (val) => {
+  advancedFilters.value.hardness = val
+  persistAdvancedFilters()
+}
+const setCountFilter = (val) => {
+  advancedFilters.value.count = val
+  persistAdvancedFilters()
+}
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -697,6 +870,55 @@ const getMineralTotalCardCount = (mineralId) => {
   return getKnowledgeCardsByMineralId(mineralId).length
 }
 
+const getMineralCountFromStore = (id) => {
+  const m = gameStore.collectedMinerals.find(m => m.id === id)
+  return m?.count || 0
+}
+
+const matchOrigin = (originField, filterValue) => {
+  if (!filterValue || filterValue === 'all') return true
+  if (!originField) return false
+  if (filterValue === 'other') {
+    return !ORIGIN_FILTERS.slice(1, -1).some(f => originField.includes(f.value))
+  }
+  return originField.includes(filterValue)
+}
+
+const matchUse = (useField, filterValue) => {
+  if (!filterValue || filterValue === 'all') return true
+  if (!useField) return false
+  const keywordMap = {
+    '珠宝': ['珠宝', '首饰', '生辰石', '宝石'],
+    '工业': ['工业', '磨料'],
+    '光学': ['光学', '镜头'],
+    '建筑': ['建筑', '水泥'],
+    '装饰': ['装饰', '工艺'],
+    '电子': ['电子', '压电', '钟表'],
+    '冶金': ['冶金', '硫磺', '硫酸'],
+    '陶瓷': ['陶瓷', '玻璃'],
+    '收藏': ['收藏']
+  }
+  const keywords = keywordMap[filterValue] || [filterValue]
+  return keywords.some(k => useField.includes(k))
+}
+
+const matchHardness = (hardnessField, filterValue) => {
+  if (!filterValue || filterValue === 'all') return true
+  const filterConfig = HARDNESS_FILTERS.find(f => f.value === filterValue)
+  if (!filterConfig) return true
+  const h = parseHardness(hardnessField)
+  return h >= filterConfig.min && h <= filterConfig.max
+}
+
+const matchCount = (countValue, filterValue) => {
+  if (!filterValue || filterValue === 'all') return true
+  if (filterValue === '0') return countValue === 0
+  if (filterValue === '1-2') return countValue >= 1 && countValue <= 2
+  if (filterValue === '3-5') return countValue >= 3 && countValue <= 5
+  if (filterValue === '6+') return countValue >= 6
+  return true
+}
+
 const filteredMinerals = computed(() => {
   let minerals = [...ALL_MINERALS_WITH_SEASON.value].sort((a, b) => {
     const rarityOrder = { legendary: 0, epic: 1, rare: 2, uncommon: 3, common: 4 }
@@ -718,8 +940,69 @@ const filteredMinerals = computed(() => {
     minerals = minerals.filter(m => m.rarity === activeFilter.value)
   }
 
+  const af = advancedFilters.value
+  minerals = minerals.filter(m => {
+    if (!matchOrigin(m.origin, af.origin)) return false
+    if (!matchUse(m.uses, af.use)) return false
+    if (!matchHardness(m.hardness, af.hardness)) return false
+    const countVal = gameStore.isMineralCollected(m.id) ? getMineralCountFromStore(m.id) : 0
+    if (!matchCount(countVal, af.count)) return false
+    return true
+  })
+
+  if (searchKeyword.value.trim()) {
+    const kw = searchKeyword.value.trim().toLowerCase()
+    minerals = minerals.filter(m => {
+      const name = (m.name || '').toLowerCase()
+      const nameEn = (m.nameEn || '').toLowerCase()
+      const formula = (m.formula || '').toLowerCase()
+      const desc = (m.description || '').toLowerCase()
+      return name.includes(kw) || nameEn.includes(kw) || formula.includes(kw) || desc.includes(kw)
+    })
+  }
+
   return minerals
 })
+
+const hasActiveAdvancedFilters = computed(() => {
+  const af = advancedFilters.value
+  return af.origin !== 'all' || af.use !== 'all' || af.hardness !== 'all' || af.count !== 'all'
+})
+
+const quickJumpCandidates = computed(() => {
+  const kw = searchKeyword.value.trim().toLowerCase()
+  if (!kw) return []
+  return ALL_MINERALS_WITH_SEASON.value
+    .filter(m => {
+      const name = (m.name || '').toLowerCase()
+      const nameEn = (m.nameEn || '').toLowerCase()
+      const formula = (m.formula || '').toLowerCase()
+      return name.startsWith(kw) || nameEn.startsWith(kw) || formula.toLowerCase().startsWith(kw)
+    })
+    .slice(0, 8)
+})
+
+const doQuickJump = (mineral) => {
+  if (!mineral) return
+  audioStore.playClick()
+  searchKeyword.value = ''
+  showQuickJump.value = false
+  if (gameStore.isMineralCollected(mineral.id)) {
+    router.push(`/mineral/${mineral.id}`)
+  }
+}
+
+const handleQuickJumpKeydown = (e) => {
+  if (e.key === 'Enter') {
+    const candidates = quickJumpCandidates.value
+    if (candidates.length > 0) {
+      doQuickJump(candidates[0])
+    }
+  } else if (e.key === 'Escape') {
+    searchKeyword.value = ''
+    showQuickJump.value = false
+  }
+}
 
 const isMineralCollected = (id) => gameStore.isMineralCollected(id)
 
@@ -2101,6 +2384,326 @@ const goToResearch = () => {
   
   .tab-btn {
     flex-shrink: 0;
+  }
+}
+
+.search-section {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: flex-start;
+}
+
+.search-box {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0 14px;
+  transition: all 0.2s ease;
+}
+
+.search-box.focused {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.15);
+}
+
+.search-icon {
+  font-size: 16px;
+  margin-right: 10px;
+  opacity: 0.6;
+}
+
+.search-input {
+  flex: 1;
+  padding: 12px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.search-hint {
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-jump-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.quick-jump-title {
+  padding: 8px 10px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.quick-jump-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-jump-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quick-jump-item:not(.collected) {
+  opacity: 0.55;
+}
+
+.qj-emoji {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.qj-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qj-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.qj-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+.qj-rarity {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.qj-arrow {
+  font-size: 14px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.advanced-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.advanced-filter-toggle:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+  color: var(--text-primary);
+}
+
+.advanced-filter-toggle.active {
+  border-color: #a855f7;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(99, 102, 241, 0.1));
+  color: #c084fc;
+}
+
+.advanced-filter-toggle.has-active .af-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 8px;
+  color: #22c55e;
+}
+
+.af-icon {
+  font-size: 14px;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.slide-down-enter-to,
+.slide-down-leave-from {
+  opacity: 1;
+  max-height: 500px;
+}
+
+.advanced-filters-panel {
+  background: var(--bg-card);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.06), rgba(99, 102, 241, 0.04));
+}
+
+.af-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.af-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.af-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.af-select {
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.af-select:hover {
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+.af-select:focus {
+  border-color: #a855f7;
+}
+
+.af-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.af-chip {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.af-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.af-chip.active {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.35);
+}
+
+.af-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-reset-af {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+}
+
+.btn-reset-af:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.af-result-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.af-result-count strong {
+  color: #a855f7;
+  font-weight: 800;
+  font-size: 14px;
+  margin: 0 2px;
+}
+
+@media (max-width: 600px) {
+  .search-section {
+    flex-direction: column;
+  }
+  .advanced-filter-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+  .af-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

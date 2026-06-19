@@ -296,3 +296,64 @@ export const getRandomUncollectedMineralByRarity = (rarity, collectedIds) => {
   if (uncollected.length === 0) return null
   return uncollected[Math.floor(Math.random() * uncollected.length)]
 }
+
+export const ORIGIN_FILTERS = [
+  { label: '全部产地', value: 'all' },
+  { label: '🇧🇷 巴西', value: '巴西' },
+  { label: '🇨🇳 中国', value: '中国' },
+  { label: '🇲🇬 马达加斯加', value: '马达加斯加' },
+  { label: '🇱🇰 斯里兰卡', value: '斯里兰卡' },
+  { label: '🇮🇳 印度', value: '印度' },
+  { label: '🇺🇸 美国', value: '美国' },
+  { label: '🇷🇺 俄罗斯', value: '俄罗斯' },
+  { label: '🇿🇲 赞比亚', value: '赞比亚' },
+  { label: '🇹🇿 坦桑尼亚', value: '坦桑尼亚' },
+  { label: '🇲🇽 墨西哥', value: '墨西哥' },
+  { label: '🇦🇷 阿根廷', value: '阿根廷' },
+  { label: '🇦🇫 阿富汗', value: '阿富汗' },
+  { label: '🇹🇭 泰国', value: '泰国' },
+  { label: '🇵🇰 巴基斯坦', value: '巴基斯坦' },
+  { label: '🇵🇪 秘鲁', value: '秘鲁' },
+  { label: '🇪🇸 西班牙', value: '西班牙' },
+  { label: '🇦🇺 澳大利亚', value: '澳大利亚' },
+  { label: '🇮🇸 冰岛', value: '冰岛' },
+  { label: '🇺🇾 乌拉圭', value: '乌拉圭' },
+  { label: '🌍 其他地区', value: 'other' }
+]
+
+export const USE_FILTERS = [
+  { label: '全部用途', value: 'all' },
+  { label: '💍 珠宝首饰', value: '珠宝' },
+  { label: '⚙️ 工业应用', value: '工业' },
+  { label: '🔬 光学仪器', value: '光学' },
+  { label: '🏗️ 建筑材料', value: '建筑' },
+  { label: '🎨 装饰工艺', value: '装饰' },
+  { label: '📱 电子工业', value: '电子' },
+  { label: '🧪 冶金化工', value: '冶金' },
+  { label: '🏺 陶瓷玻璃', value: '陶瓷' },
+  { label: '💎 收藏宝石', value: '收藏' }
+]
+
+export const HARDNESS_FILTERS = [
+  { label: '全部硬度', value: 'all', min: 0, max: 10 },
+  { label: '软 (1-3)', value: 'soft', min: 1, max: 3 },
+  { label: '中 (4-6)', value: 'medium', min: 4, max: 6 },
+  { label: '硬 (7-8)', value: 'hard', min: 7, max: 8 },
+  { label: '极硬 (9-10)', value: 'very_hard', min: 9, max: 10 }
+]
+
+export const COLLECTION_COUNT_FILTERS = [
+  { label: '全部', value: 'all' },
+  { label: '未收集 (0)', value: '0' },
+  { label: '少量 (1-2)', value: '1-2' },
+  { label: '中等 (3-5)', value: '3-5' },
+  { label: '丰富 (6+)', value: '6+' }
+]
+
+export const parseHardness = (hardnessStr) => {
+  if (!hardnessStr) return 0
+  const match = hardnessStr.match(/([\d.]+)(?:\s*-\s*([\d.]+))?/)
+  if (!match) return 0
+  if (match[2]) return (parseFloat(match[1]) + parseFloat(match[2])) / 2
+  return parseFloat(match[1])
+}

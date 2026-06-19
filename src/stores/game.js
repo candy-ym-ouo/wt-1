@@ -9,6 +9,7 @@ import {
   getRarityByLevel, 
   getRarityLevel 
 } from '@/data/expeditions'
+import { useDetectorStore } from './detector'
 
 const STORAGE_KEY = 'mineral_collage_progress'
 
@@ -81,6 +82,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   const collectMineral = (mineral) => {
+    const detectorStore = useDetectorStore()
     if (!isMineralCollected(mineral.id)) {
       collectedMinerals.value.push({
         ...mineral,
@@ -88,23 +90,36 @@ export const useGameStore = defineStore('game', () => {
         count: 1
       })
       emitTaskEvent('mineralCollected', mineral)
+      
+      const bonusCoins = detectorStore.applyCoinBonus(RARITY_CONFIG[mineral.rarity].starCount * 10)
+      coins.value += bonusCoins
+      emitTaskEvent('coinsEarned', bonusCoins)
+      
       saveProgress()
       return true
     } else {
       const existing = collectedMinerals.value.find(m => m.id === mineral.id)
-      existing.count++
-      coins.value += 10
+      
+      const dropCount = detectorStore.rollMultiDropCount()
+      existing.count += dropCount
+      
+      const baseCoins = 10 * dropCount
+      const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
+      coins.value += bonusCoins
+      
       emitTaskEvent('mineralCollected', mineral)
-      emitTaskEvent('coinsEarned', 10)
+      emitTaskEvent('coinsEarned', bonusCoins)
       saveProgress()
       return false
     }
   }
 
   const startNewCollage = (mineral = null) => {
+    const detectorStore = useDetectorStore()
     let targetMineral = mineral
     if (!targetMineral) {
-      const rarity = getRarityByProbability()
+      let rarity = getRarityByProbability()
+      rarity = detectorStore.applyRarityBoost(rarity)
       targetMineral = getRandomMineralByRarity(rarity)
     }
 
@@ -182,11 +197,14 @@ export const useGameStore = defineStore('game', () => {
   }
 
   const checkCollageComplete = () => {
+    const detectorStore = useDetectorStore()
     const allPlaced = collagePieces.value.every(p => p.isPlaced)
     if (allPlaced && currentCollage.value) {
       const isNew = collectMineral(currentCollage.value)
-      coins.value += RARITY_CONFIG[currentCollage.value.rarity].starCount * 20
-      emitTaskEvent('coinsEarned', RARITY_CONFIG[currentCollage.value.rarity].starCount * 20)
+      const baseCoins = RARITY_CONFIG[currentCollage.value.rarity].starCount * 20
+      const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
+      coins.value += bonusCoins
+      emitTaskEvent('coinsEarned', bonusCoins)
 
       completedCollages.value.push({
         mineral: currentCollage.value,
@@ -435,28 +453,42 @@ export const useGameStore = defineStore('game', () => {
   const completeExpedition = () => {
     if (!currentExpedition.value) return
 
+    const detectorStore = useDetectorStore()
     const expedition = currentExpedition.value
     let finalCoins = Math.floor(expedition.baseCoins * expedition.coinMultiplier)
     let mineral = null
     let isNew = false
+    let mineralCount = 1
 
-    if (expedition.mineralChance > 0 && Math.random() < expedition.mineralChance) {
-      const minLevel = getRarityLevel(expedition.minRarity)
-      const maxLevel = getRarityLevel(expedition.maxRarity)
-      let targetLevel = Math.floor(Math.random() * (maxLevel - minLevel + 1)) + minLevel
-      targetLevel = Math.min(4, Math.max(0, targetLevel + (expedition.rarityBonus || 0)))
-      
-      const targetRarity = getRarityByLevel(targetLevel)
-      mineral = getRandomMineralByRarity(targetRarity)
-      
-      if (mineral) {
-        isNew = collectMineral(mineral)
+    if (expedition.mineralChance > 0) {
+      const adjustedChance = detectorStore.applyDropRateBoost(expedition.mineralChance)
+      if (Math.random() < adjustedChance) {
+        const minLevel = getRarityLevel(expedition.minRarity)
+        const maxLevel = getRarityLevel(expedition.maxRarity)
+        let targetLevel = Math.floor(Math.random() * (maxLevel - minLevel + 1)) + minLevel
+        targetLevel = Math.min(4, Math.max(0, targetLevel + (expedition.rarityBonus || 0)))
+        
+        let targetRarity = getRarityByLevel(targetLevel)
+        targetRarity = detectorStore.applyRarityBoost(targetRarity)
+        mineral = getRandomMineralByRarity(targetRarity)
+        
+        if (mineral) {
+          mineralCount = detectorStore.rollMultiDropCount()
+          for (let i = 0; i < mineralCount; i++) {
+            isNew = collectMineral(mineral) || isNew
+          }
+        }
       }
     }
 
+    const { exp: adjustedExp, coins: adjustedCoins } = detectorStore.applyExpeditionBonus(
+      expedition.difficulty * 20 + Math.floor(finalCoins / 10),
+      finalCoins
+    )
+    finalCoins = adjustedCoins
+    const expGain = adjustedExp
+
     coins.value += finalCoins
-    
-    const expGain = expedition.difficulty * 20 + Math.floor(finalCoins / 10)
     addExp(expGain)
 
     emitTaskEvent('expeditionComplete', finalCoins)

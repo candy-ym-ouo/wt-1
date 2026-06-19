@@ -107,6 +107,7 @@ import { useMuseumStore } from './stores/museum'
 import { useQuizStore } from './stores/quiz'
 import { useExchangeStore } from './stores/exchange'
 import { useSeasonStore } from './stores/season'
+import { useDetectorStore } from './stores/detector'
 import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
 import { useRouter } from 'vue-router'
 import { MINERALS } from './data/minerals'
@@ -122,6 +123,7 @@ const museumStore = useMuseumStore()
 const quizStore = useQuizStore()
 const exchangeStore = useExchangeStore()
 const seasonStore = useSeasonStore()
+const detectorStore = useDetectorStore()
 
 const navItems = [
   { path: '/', icon: '🏛️', label: '博物馆' },
@@ -188,6 +190,7 @@ onMounted(() => {
   quizStore.loadProgress()
   exchangeStore.loadExchangeData()
   seasonStore.loadSeasonData()
+  detectorStore.loadProgress()
 
   gameStore.onTaskEvent = (eventName, payload) => {
     switch (eventName) {

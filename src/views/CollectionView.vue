@@ -1,165 +1,496 @@
 <template>
   <div class="collection-view">
-    <div class="collection-header">
-      <div class="header-content">
-        <h1 class="page-title">矿物图鉴</h1>
-        <p class="page-subtitle">探索矿物的奥秘，了解它们的特性与传说</p>
-      </div>
-    </div>
-
-    <div class="progress-section">
-      <div class="progress-card">
-        <div class="progress-info">
-          <span class="progress-label">收集进度</span>
-          <span class="progress-value">{{ progress.collected }}/{{ progress.total }}</span>
-        </div>
-        <div class="progress-bar-large">
-          <div class="progress-fill" :style="{ width: `${progress.percentage}%` }"></div>
-        </div>
-        <div class="progress-text">{{ progress.percentage }}% 完成</div>
-      </div>
-    </div>
-
-    <div class="filter-section">
-      <div class="filter-tabs">
+    <div class="tabs-section">
+      <div class="tabs-wrapper">
         <button 
-          v-for="filter in filters" 
-          :key="filter.value"
-          :class="['filter-btn', { active: activeFilter === filter.value }]"
-          @click="activeFilter = filter.value"
+          :class="['tab-btn', { active: activeTab === 'collection' }]"
+          @click="activeTab = 'collection'"
         >
-          {{ filter.label }}
-        </button>
-      </div>
-      <div class="view-toggle">
-        <button 
-          :class="['toggle-btn', { active: viewMode === 'grid' }]"
-          @click="viewMode = 'grid'"
-        >
-          网格
+          <span class="tab-icon">📖</span>
+          <span class="tab-label">矿物图鉴</span>
         </button>
         <button 
-          :class="['toggle-btn', { active: viewMode === 'list' }]"
-          @click="viewMode = 'list'"
+          :class="['tab-btn', { active: activeTab === 'detector' }]"
+          @click="activeTab = 'detector'"
         >
-          列表
+          <span class="tab-icon">🛠️</span>
+          <span class="tab-label">探测器养成</span>
+          <span class="tab-badge" v-if="detectorStore.canUpgrade()">!</span>
         </button>
       </div>
     </div>
 
-    <div class="action-bar">
-      <button class="btn btn-small" @click="goToMarket">
-        <span class="btn-icon">🏪</span>
-        前往市场
-      </button>
-      <button
-        class="btn btn-secondary btn-small"
-        @click="openListModal"
-        :disabled="gameStore.collectedMinerals.length === 0"
-      >
-        <span class="btn-icon">📤</span>
-        上架矿物
-      </button>
-      <button
-        class="btn btn-small exchange-entry-btn"
-        @click="goToExchange"
-      >
-        <span class="btn-icon">🔄</span>
-        交换站
-      </button>
-    </div>
-
-    <div class="rarity-legend">
-      <div 
-        v-for="(config, rarity) in RARITY_CONFIG" 
-        :key="rarity"
-        class="legend-item"
-      >
-        <span class="legend-dot" :style="{ background: config.color }"></span>
-        <span :class="`rarity-${rarity}`">{{ config.name }}</span>
-        <span class="legend-count">{{ getRarityCount(rarity) }}</span>
-      </div>
-    </div>
-
-    <div class="season-specimens-section" v-if="seasonLimitedSpecimens.length > 0">
-      <div class="section-header-row">
-        <h2 class="section-label">🔮 赛季限定标本</h2>
-        <button class="btn btn-small season-go-btn" @click="goToSeason">
-          查看赛季 →
-        </button>
-      </div>
-      <div class="season-specimens-row">
-        <div
-          v-for="specimen in seasonLimitedSpecimens"
-          :key="specimen.id"
-          class="season-specimen-card"
-          :class="{ collected: isSeasonSpecimenCollected(specimen.id), [`rarity-${specimen.rarity}`]: true }"
-          @click="viewSeasonSpecimen(specimen)"
-        >
-          <div class="specimen-exclusive-tag">限定</div>
-          <span class="specimen-emoji-small">{{ specimen.emoji }}</span>
-          <span class="specimen-name-small">{{ specimen.name }}</span>
-          <span class="specimen-status" v-if="!isSeasonSpecimenCollected(specimen.id)">🔒</span>
-          <span class="specimen-status collected-status" v-else>✓</span>
+    <div v-show="activeTab === 'collection'">
+      <div class="collection-header">
+        <div class="header-content">
+          <h1 class="page-title">矿物图鉴</h1>
+          <p class="page-subtitle">探索矿物的奥秘，了解它们的特性与传说</p>
         </div>
       </div>
-    </div>
 
-    <div class="minerals-container">
-      <div v-if="filteredMinerals.length === 0" class="empty-state">
-        <div class="empty-icon">🔍</div>
-        <p class="empty-text">没有找到符合条件的矿物</p>
+      <div class="progress-section">
+        <div class="progress-card">
+          <div class="progress-info">
+            <span class="progress-label">收集进度</span>
+            <span class="progress-value">{{ progress.collected }}/{{ progress.total }}</span>
+          </div>
+          <div class="progress-bar-large">
+            <div class="progress-fill" :style="{ width: `${progress.percentage}%` }"></div>
+          </div>
+          <div class="progress-text">{{ progress.percentage }}% 完成</div>
+        </div>
       </div>
 
-      <div v-else-if="viewMode === 'grid'" class="minerals-grid">
-        <MineralCard
-          v-for="mineral in filteredMinerals"
-          :key="mineral.id"
-          :mineral="mineral"
-          :is-collected="isMineralCollected(mineral.id)"
-          :show-locked="true"
-          :glow="isMineralCollected(mineral.id) && mineral.rarity === 'legendary'"
-          @click="viewMineralDetail"
-        />
+      <div class="filter-section">
+        <div class="filter-tabs">
+          <button 
+            v-for="filter in filters" 
+            :key="filter.value"
+            :class="['filter-btn', { active: activeFilter === filter.value }]"
+            @click="activeFilter = filter.value"
+          >
+            {{ filter.label }}
+          </button>
+        </div>
+        <div class="view-toggle">
+          <button 
+            :class="['toggle-btn', { active: viewMode === 'grid' }]"
+            @click="viewMode = 'grid'"
+          >
+            网格
+          </button>
+          <button 
+            :class="['toggle-btn', { active: viewMode === 'list' }]"
+            @click="viewMode = 'list'"
+          >
+            列表
+          </button>
+        </div>
       </div>
 
-      <div v-else class="minerals-list">
+      <div class="action-bar">
+        <button class="btn btn-small" @click="goToMarket">
+          <span class="btn-icon">🏪</span>
+          前往市场
+        </button>
+        <button
+          class="btn btn-secondary btn-small"
+          @click="openListModal"
+          :disabled="gameStore.collectedMinerals.length === 0"
+        >
+          <span class="btn-icon">📤</span>
+          上架矿物
+        </button>
+        <button
+          class="btn btn-small exchange-entry-btn"
+          @click="goToExchange"
+        >
+          <span class="btn-icon">🔄</span>
+          交换站
+        </button>
+      </div>
+
+      <div class="rarity-legend">
         <div 
-          v-for="mineral in filteredMinerals"
-          :key="mineral.id"
-          :class="['list-item', { collected: isMineralCollected(mineral.id) }]"
-          @click="viewMineralDetail(mineral)"
+          v-for="(config, rarity) in RARITY_CONFIG" 
+          :key="rarity"
+          class="legend-item"
         >
-          <span class="item-emoji">{{ isMineralCollected(mineral.id) ? mineral.emoji : '❓' }}</span>
-          <div class="item-content">
-            <div class="item-header">
-              <h3 class="item-name">{{ isMineralCollected(mineral.id) ? mineral.name : '???' }}</h3>
-              <span :class="['item-rarity', `rarity-${mineral.rarity}`]">
-                {{ RARITY_CONFIG[mineral.rarity].name }}
+          <span class="legend-dot" :style="{ background: config.color }"></span>
+          <span :class="`rarity-${rarity}`">{{ config.name }}</span>
+          <span class="legend-count">{{ getRarityCount(rarity) }}</span>
+        </div>
+      </div>
+
+      <div class="season-specimens-section" v-if="seasonLimitedSpecimens.length > 0">
+        <div class="section-header-row">
+          <h2 class="section-label">🔮 赛季限定标本</h2>
+          <button class="btn btn-small season-go-btn" @click="goToSeason">
+            查看赛季 →
+          </button>
+        </div>
+        <div class="season-specimens-row">
+          <div
+            v-for="specimen in seasonLimitedSpecimens"
+            :key="specimen.id"
+            class="season-specimen-card"
+            :class="{ collected: isSeasonSpecimenCollected(specimen.id), [`rarity-${specimen.rarity}`]: true }"
+            @click="viewSeasonSpecimen(specimen)"
+          >
+            <div class="specimen-exclusive-tag">限定</div>
+            <span class="specimen-emoji-small">{{ specimen.emoji }}</span>
+            <span class="specimen-name-small">{{ specimen.name }}</span>
+            <span class="specimen-status" v-if="!isSeasonSpecimenCollected(specimen.id)">🔒</span>
+            <span class="specimen-status collected-status" v-else>✓</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="minerals-container">
+        <div v-if="filteredMinerals.length === 0" class="empty-state">
+          <div class="empty-icon">🔍</div>
+          <p class="empty-text">没有找到符合条件的矿物</p>
+        </div>
+
+        <div v-else-if="viewMode === 'grid'" class="minerals-grid">
+          <MineralCard
+            v-for="mineral in filteredMinerals"
+            :key="mineral.id"
+            :mineral="mineral"
+            :is-collected="isMineralCollected(mineral.id)"
+            :show-locked="true"
+            :glow="isMineralCollected(mineral.id) && mineral.rarity === 'legendary'"
+            @click="viewMineralDetail"
+          />
+        </div>
+
+        <div v-else class="minerals-list">
+          <div 
+            v-for="mineral in filteredMinerals"
+            :key="mineral.id"
+            :class="['list-item', { collected: isMineralCollected(mineral.id) }]"
+            @click="viewMineralDetail(mineral)"
+          >
+            <span class="item-emoji">{{ isMineralCollected(mineral.id) ? mineral.emoji : '❓' }}</span>
+            <div class="item-content">
+              <div class="item-header">
+                <h3 class="item-name">{{ isMineralCollected(mineral.id) ? mineral.name : '???' }}</h3>
+                <span :class="['item-rarity', `rarity-${mineral.rarity}`]">
+                  {{ RARITY_CONFIG[mineral.rarity].name }}
+                </span>
+              </div>
+              <p class="item-desc">
+                {{ isMineralCollected(mineral.id) ? mineral.description.slice(0, 50) + '...' : '完成拼装解锁详情' }}
+              </p>
+              <div class="item-meta" v-if="isMineralCollected(mineral.id)">
+                <span class="meta-item">化学式: {{ mineral.formula }}</span>
+                <span class="meta-item">硬度: {{ mineral.hardness }}</span>
+                <span class="meta-item">数量: {{ getMineralCount(mineral.id) }}</span>
+              </div>
+            </div>
+            <div class="item-actions" v-if="isMineralCollected(mineral.id)" @click.stop>
+              <button 
+                class="btn btn-small list-btn" 
+                @click="listMineral(mineral)"
+                :disabled="getMineralCount(mineral.id) < 1"
+              >
+                📤 上架
+              </button>
+            </div>
+            <span class="item-arrow" v-else>›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-show="activeTab === 'detector'">
+      <div class="detector-header">
+        <h1 class="page-title">🔧 矿物探测器</h1>
+        <p class="page-subtitle">升级探测器，提升矿物发现概率和品质</p>
+      </div>
+
+      <div class="coins-indicator">
+        <span class="coins-icon">💰</span>
+        <span class="coins-value">{{ gameStore.coins.toLocaleString() }}</span>
+        <span class="coins-label">金币</span>
+      </div>
+
+      <div class="tier-selector">
+        <div class="tier-scroll">
+          <button
+            v-for="(config, tier) in DETECTOR_TIER_CONFIG"
+            :key="tier"
+            :class="[
+              'tier-card',
+              { 
+                active: detectorStore.currentTier === tier,
+                unlocked: detectorStore.unlockedTiers.includes(tier),
+                locked: !detectorStore.unlockedTiers.includes(tier)
+              }
+            ]"
+            @click="handleTierClick(tier)"
+          >
+            <div class="tier-emoji" :style="{ background: config.gradient }">
+              {{ detectorStore.unlockedTiers.includes(tier) ? config.emoji : '🔒' }}
+            </div>
+            <div class="tier-name">{{ config.name }}</div>
+            <div class="tier-unlock" v-if="!detectorStore.unlockedTiers.includes(tier)">
+              {{ config.unlockCost.toLocaleString() }} 💰
+            </div>
+            <div class="tier-level" v-else-if="detectorStore.currentTier === tier">
+              Lv.{{ detectorStore.currentLevel }}
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="detector-main-card" :style="{ borderColor: detectorStore.currentTierConfig.borderColor || 'rgba(255,255,255,0.1)' }">
+        <div class="detector-top-section">
+          <div class="detector-visual">
+            <div class="detector-circle" :style="{ background: detectorStore.currentTierConfig.gradient }">
+              <span class="detector-emoji-big">{{ detectorStore.currentTierConfig.emoji }}</span>
+              <div class="scan-ring"></div>
+              <div class="scan-ring delay-1"></div>
+            </div>
+          </div>
+          <div class="detector-info">
+            <h2 class="detector-name" :style="{ color: detectorStore.currentTierConfig.color }">
+              {{ detectorStore.currentTierConfig.name }}
+            </h2>
+            <p class="detector-desc">{{ detectorStore.currentTierConfig.description }}</p>
+            
+            <div class="level-section">
+              <div class="level-info">
+                <span class="level-label">等级</span>
+                <span class="level-value">
+                  Lv.{{ detectorStore.currentLevel }}
+                  <span class="level-max">/ {{ detectorStore.currentTierConfig.maxLevel }}</span>
+                </span>
+              </div>
+              <div class="exp-bar-wrapper">
+                <div class="exp-bar">
+                  <div 
+                    class="exp-fill" 
+                    :style="{ 
+                      width: `${detectorStore.expPercentage}%`,
+                      background: detectorStore.currentTierConfig.gradient
+                    }"
+                  ></div>
+                </div>
+                <span class="exp-text">
+                  {{ Math.floor(detectorStore.currentExp) }} / {{ detectorStore.expToNextLevel }} EXP
+                </span>
+              </div>
+            </div>
+
+            <div class="upgrade-section">
+              <button 
+                class="btn btn-upgrade"
+                :disabled="!detectorStore.canUpgrade()"
+                @click="handleUpgrade"
+                :style="{ 
+                  background: detectorStore.maxLevelReached 
+                    ? 'linear-gradient(135deg, #6b7280, #9ca3af)' 
+                    : detectorStore.currentTierConfig.gradient 
+                }"
+              >
+                <span v-if="detectorStore.maxLevelReached">✨ 已达最高等级</span>
+                <template v-else>
+                  <span class="upgrade-label">⬆️ 升级</span>
+                  <span class="upgrade-cost">{{ detectorStore.upgradeCostAmount.toLocaleString() }} 💰</span>
+                </template>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <h3 class="section-title">📊 效果加成</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-icon">💎</span>
+              <span class="stat-name">稀有度提升</span>
+            </div>
+            <div class="stat-values">
+              <span class="stat-base">基础 +{{ detectorStore.baseStats.rarityBonus }}</span>
+              <span class="stat-arrow">→</span>
+              <span class="stat-total" :style="{ color: detectorStore.currentTierConfig.color }">
+                +{{ detectorStore.totalStats.rarityBonus }} 级
               </span>
             </div>
-            <p class="item-desc">
-              {{ isMineralCollected(mineral.id) ? mineral.description.slice(0, 50) + '...' : '完成拼装解锁详情' }}
-            </p>
-            <div class="item-meta" v-if="isMineralCollected(mineral.id)">
-              <span class="meta-item">化学式: {{ mineral.formula }}</span>
-              <span class="meta-item">硬度: {{ mineral.hardness }}</span>
-              <span class="meta-item">数量: {{ getMineralCount(mineral.id) }}</span>
+          </div>
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-icon">🎯</span>
+              <span class="stat-name">掉落率提升</span>
+            </div>
+            <div class="stat-values">
+              <span class="stat-base">基础 +{{ detectorStore.baseStats.dropRateBonus }}%</span>
+              <span class="stat-arrow">→</span>
+              <span class="stat-total" :style="{ color: detectorStore.currentTierConfig.color }">
+                +{{ detectorStore.totalStats.dropRateBonus }}%
+              </span>
             </div>
           </div>
-          <div class="item-actions" v-if="isMineralCollected(mineral.id)" @click.stop>
-            <button 
-              class="btn btn-small list-btn" 
-              @click="listMineral(mineral)"
-              :disabled="getMineralCount(mineral.id) < 1"
-            >
-              📤 上架
-            </button>
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-icon">💰</span>
+              <span class="stat-name">金币加成</span>
+            </div>
+            <div class="stat-values">
+              <span class="stat-base">基础 +{{ detectorStore.baseStats.coinBonus }}%</span>
+              <span class="stat-arrow">→</span>
+              <span class="stat-total" :style="{ color: detectorStore.currentTierConfig.color }">
+                +{{ detectorStore.totalStats.coinBonus }}%
+              </span>
+            </div>
           </div>
-          <span class="item-arrow" v-else>›</span>
+          <div class="stat-card" v-if="detectorStore.totalStats.multiDropChance > 0">
+            <div class="stat-header">
+              <span class="stat-icon">🎊</span>
+              <span class="stat-name">多重掉落</span>
+            </div>
+            <div class="stat-values">
+              <span class="stat-total" :style="{ color: detectorStore.currentTierConfig.color }">
+                {{ detectorStore.totalStats.multiDropChance }}% 概率
+              </span>
+            </div>
+          </div>
+          <div class="stat-card" v-if="detectorStore.totalStats.expeditionBonus > 0">
+            <div class="stat-header">
+              <span class="stat-icon">🗺️</span>
+              <span class="stat-name">探险加成</span>
+            </div>
+            <div class="stat-values">
+              <span class="stat-total" :style="{ color: detectorStore.currentTierConfig.color }">
+                +{{ detectorStore.totalStats.expeditionBonus }}%
+              </span>
+            </div>
+          </div>
+          <div 
+            v-for="(bonus, rarity) in detectorStore.totalStats.specificRarityBonus" 
+            :key="rarity"
+            class="stat-card specific-rarity-card"
+          >
+            <div class="stat-header">
+              <span class="stat-icon">✨</span>
+              <span class="stat-name">
+                {{ { rare: '珍稀', epic: '史诗', legendary: '传说' }[rarity] }}概率
+              </span>
+            </div>
+            <div class="stat-values">
+              <span class="stat-total" :style="{ color: RARITY_CONFIG[rarity].color }">
+                +{{ bonus }}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="affixes-section">
+        <div class="affixes-header">
+          <h3 class="section-title">🔮 词条系统</h3>
+          <div class="affixes-count">
+            {{ detectorStore.affixes.length }} / {{ detectorStore.maxAffixSlotsCount }}
+          </div>
+        </div>
+
+        <div class="affixes-grid">
+          <div
+            v-for="affix in detectorStore.affixes"
+            :key="affix.id"
+            class="affix-card"
+            :style="{ borderColor: AFFIX_QUALITY_CONFIG[affix.quality].color + '66' }"
+          >
+            <div 
+              class="affix-quality-bar"
+              :style="{ background: AFFIX_QUALITY_CONFIG[affix.quality].color }"
+            ></div>
+            <div class="affix-content">
+              <div class="affix-top">
+                <span 
+                  class="affix-quality-tag"
+                  :style="{ 
+                    background: AFFIX_QUALITY_CONFIG[affix.quality].color + '22',
+                    color: AFFIX_QUALITY_CONFIG[affix.quality].color 
+                  }"
+                >
+                  {{ AFFIX_QUALITY_CONFIG[affix.quality].name }}
+                </span>
+                <button 
+                  class="affix-reroll-btn"
+                  @click="handleRerollAffix(affix.id)"
+                  :disabled="!detectorStore.canRerollAffix()"
+                  :title="`重铸 (${detectorStore.rerollCostAmount} 金币)`"
+                >
+                  🔄
+                </button>
+              </div>
+              <div class="affix-text">{{ detectorStore.getAffixDisplay(affix) }}</div>
+            </div>
+          </div>
+
+          <div
+            v-for="i in detectorStore.availableAffixSlots"
+            :key="'empty-' + i"
+            class="affix-card empty-affix"
+          >
+            <div class="empty-affix-content">
+              <span class="empty-affix-icon">+</span>
+              <span class="empty-affix-text">升级解锁词条</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="affix-actions">
+          <button 
+            class="btn btn-reroll-all"
+            @click="handleRerollAllAffixes"
+            :disabled="!detectorStore.canRerollAffix()"
+          >
+            <span>🔄 重铸最后词条</span>
+            <span class="action-cost">{{ detectorStore.rerollCostAmount.toLocaleString() }} 💰</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="detector-tips-section">
+        <h3 class="section-title">💡 使用说明</h3>
+        <div class="tips-list">
+          <div class="tip-item">
+            <span class="tip-icon">🎯</span>
+            <div class="tip-content">
+              <strong>稀有度提升：</strong>拼装、探险、盲盒中获得更高稀有度矿物的概率提升
+            </div>
+          </div>
+          <div class="tip-item">
+            <span class="tip-icon">🎰</span>
+            <div class="tip-content">
+              <strong>掉落率提升：</strong>探险时矿物掉落基础概率提升（最大95%）
+            </div>
+          </div>
+          <div class="tip-item">
+            <span class="tip-icon">💰</span>
+            <div class="tip-content">
+              <strong>金币加成：</strong>获得矿物和完成拼装时额外获得金币奖励
+            </div>
+          </div>
+          <div class="tip-item">
+            <span class="tip-icon">🎊</span>
+            <div class="tip-content">
+              <strong>多重掉落：</strong>有概率一次获得2-3个相同矿物
+            </div>
+          </div>
+          <div class="tip-item">
+            <span class="tip-icon">🔮</span>
+            <div class="tip-content">
+              <strong>词条重铸：</strong>使用金币刷新词条品质和类型，追求最佳组合
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="upgrade-stats">
+        <div class="upgrade-stat-item">
+          <span class="stat-label">累计升级</span>
+          <span class="stat-value">{{ detectorStore.totalUpgrades }} 次</span>
+        </div>
+        <div class="upgrade-stat-item">
+          <span class="stat-label">累计重铸</span>
+          <span class="stat-value">{{ detectorStore.totalRerolls }} 次</span>
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <Transition name="toast">
+        <div v-if="toastMessage" class="detector-toast" :class="{ success: toastSuccess, error: !toastSuccess }">
+          {{ toastMessage }}
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -171,15 +502,87 @@ import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
 import { useSeasonStore } from '@/stores/season'
+import { useDetectorStore } from '@/stores/detector'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { MINERALS } from '@/data/minerals'
 import { SEASONS } from '@/data/season'
+import { 
+  DETECTOR_TIER_CONFIG, 
+  DETECTOR_TIERS,
+  AFFIX_QUALITY_CONFIG
+} from '@/data/detector'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const seasonStore = useSeasonStore()
+const detectorStore = useDetectorStore()
+
+const activeTab = ref('collection')
+const toastMessage = ref('')
+const toastSuccess = ref(true)
+let toastTimer = null
+
+const showToast = (message, success = true) => {
+  toastMessage.value = message
+  toastSuccess.value = success
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastMessage.value = ''
+  }, 2500)
+}
+
+const handleTierClick = (tier) => {
+  audioStore.playClick()
+  if (!detectorStore.unlockedTiers.includes(tier)) {
+    const result = detectorStore.unlockTier(tier)
+    showToast(result.message, result.success)
+    if (result.success) {
+      audioStore.playSuccess?.()
+    } else {
+      audioStore.playError()
+    }
+  } else if (detectorStore.currentTier !== tier) {
+    const result = detectorStore.switchTier(tier)
+    if (result.success) {
+      showToast(`切换至 ${DETECTOR_TIER_CONFIG[tier].name}`, true)
+    }
+  }
+}
+
+const handleUpgrade = () => {
+  audioStore.playClick()
+  const result = detectorStore.upgradeLevel()
+  showToast(result.message, result.success)
+  if (result.success) {
+    audioStore.playSuccess?.()
+  } else {
+    audioStore.playError()
+  }
+}
+
+const handleRerollAffix = (affixId) => {
+  audioStore.playClick()
+  const result = detectorStore.rerollAffix(affixId)
+  showToast(result.message, result.success)
+  if (result.success) {
+    audioStore.playSuccess?.()
+  } else {
+    audioStore.playError()
+  }
+}
+
+const handleRerollAllAffixes = () => {
+  audioStore.playClick()
+  const result = detectorStore.rerollAffix()
+  showToast(result.message, result.success)
+  if (result.success) {
+    audioStore.playSuccess?.()
+  } else {
+    audioStore.playError()
+  }
+}
 
 const getSeasonLimitedMinerals = () => {
   const list = []
@@ -318,6 +721,74 @@ const viewSeasonSpecimen = (specimen) => {
   overflow-y: auto;
   padding: 16px;
   padding-bottom: 90px;
+}
+
+.tabs-section {
+  margin-bottom: 20px;
+  position: sticky;
+  top: -16px;
+  z-index: 10;
+  padding: 12px 0 8px;
+  margin: -16px -16px 0;
+  padding-left: 16px;
+  padding-right: 16px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tabs-wrapper {
+  display: flex;
+  gap: 8px;
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--primary), #ff6b6b);
+  color: white;
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  min-width: 16px;
+  height: 16px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
 }
 
 .collection-header {
@@ -760,14 +1231,655 @@ const viewSeasonSpecimen = (specimen) => {
   margin-right: 6px;
 }
 
+.detector-header {
+  margin-bottom: 16px;
+  margin-top: 12px;
+}
+
+.coins-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.1));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.coins-icon {
+  font-size: 20px;
+}
+
+.coins-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.coins-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.tier-selector {
+  margin-bottom: 16px;
+}
+
+.tier-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.tier-card {
+  flex-shrink: 0;
+  width: 90px;
+  padding: 12px 8px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tier-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tier-card.active {
+  border-color: #fbbf24;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+  background: linear-gradient(180deg, rgba(251, 191, 36, 0.1), transparent);
+}
+
+.tier-card.locked {
+  opacity: 0.6;
+}
+
+.tier-card.locked:hover {
+  opacity: 0.8;
+}
+
+.tier-emoji {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.tier-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tier-unlock {
+  font-size: 9px;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.tier-level {
+  font-size: 10px;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.detector-main-card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+.detector-top-section {
+  display: flex;
+  gap: 16px;
+}
+
+.detector-visual {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.detector-circle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.detector-emoji-big {
+  font-size: 48px;
+  z-index: 2;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.scan-ring {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  animation: scanPulse 2s ease-in-out infinite;
+}
+
+.scan-ring.delay-1 {
+  animation-delay: 1s;
+}
+
+@keyframes scanPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+.detector-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.detector-name {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+
+.detector-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.level-section {
+  margin-bottom: 14px;
+}
+
+.level-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.level-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.level-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.level-max {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.exp-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exp-bar {
+  flex: 1;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.exp-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.5s ease;
+}
+
+.exp-text {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+
+.upgrade-section {
+  margin-top: 4px;
+}
+
+.btn-upgrade {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.btn-upgrade:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.btn-upgrade:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.upgrade-label {
+  font-weight: 700;
+}
+
+.upgrade-cost {
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.stats-section {
+  margin-bottom: 20px;
+}
+
+.stats-section .section-title {
+  margin-bottom: 12px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.stat-icon {
+  font-size: 16px;
+}
+
+.stat-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.stat-values {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-base {
+  font-size: 11px;
+  color: #6b7280;
+  text-decoration: line-through;
+}
+
+.stat-arrow {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.stat-total {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.specific-rarity-card {
+  grid-column: span 2;
+}
+
+.affixes-section {
+  margin-bottom: 20px;
+}
+
+.affixes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.affixes-count {
+  padding: 4px 12px;
+  background: var(--bg-card);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.affixes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.affix-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  position: relative;
+}
+
+.affix-quality-bar {
+  height: 3px;
+  width: 100%;
+}
+
+.affix-content {
+  padding: 10px 12px;
+}
+
+.affix-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.affix-quality-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.affix-reroll-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.affix-reroll-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.4);
+  transform: rotate(180deg);
+}
+
+.affix-reroll-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.affix-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.empty-affix {
+  border-style: dashed;
+  background: transparent;
+}
+
+.empty-affix-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.5;
+}
+
+.empty-affix-icon {
+  font-size: 24px;
+  color: var(--text-secondary);
+  font-weight: 300;
+}
+
+.empty-affix-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.affix-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-reroll-all {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.15));
+  color: #fbbf24;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-reroll-all:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(251, 191, 36, 0.25));
+  transform: translateY(-1px);
+}
+
+.btn-reroll-all:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-cost {
+  padding: 3px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.detector-tips-section {
+  margin-bottom: 20px;
+}
+
+.detector-tips-section .section-title {
+  margin-bottom: 12px;
+}
+
+.tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tip-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tip-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.tip-content {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tip-content strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.upgrade-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.upgrade-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.upgrade-stat-item .stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.upgrade-stat-item .stat-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.detector-toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 5000;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  max-width: 90%;
+  text-align: center;
+}
+
+.detector-toast.success {
+  background: rgba(34, 197, 94, 0.95);
+  color: white;
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.detector-toast.error {
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.toast-enter-active {
+  animation: toastIn 0.3s ease;
+}
+
+.toast-leave-active {
+  animation: toastOut 0.3s ease;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+}
+
 @media (min-width: 600px) {
   .minerals-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .specific-rarity-card {
+    grid-column: span 1;
   }
 }
 
 @media (min-width: 900px) {
   .minerals-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .stats-grid {
     grid-template-columns: repeat(4, 1fr);
   }
 }
@@ -788,6 +1900,20 @@ const viewSeasonSpecimen = (specimen) => {
   
   .rarity-legend {
     gap: 8px;
+  }
+
+  .detector-top-section {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .specific-rarity-card {
+    grid-column: span 1;
   }
 }
 </style>

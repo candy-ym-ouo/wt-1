@@ -14,6 +14,7 @@ import {
 import { getRandomMineralByRarity } from '@/data/minerals'
 import { RARITY, RARITY_CONFIG } from '@/data/rarity'
 import { useGameStore } from '@/stores/game'
+import { useDetectorStore } from '@/stores/detector'
 
 const STORAGE_KEY = 'mineral_gacha_progress'
 
@@ -113,6 +114,7 @@ export const useGachaStore = defineStore('gacha', () => {
 
     const pityConfig = getPityConfig(boxType)
     const ticket = getTicketById(ticketType)
+    const detectorStore = useDetectorStore()
     const results = []
     let pityCount = pityCounters.value[boxType] || 0
 
@@ -125,6 +127,7 @@ export const useGachaStore = defineStore('gacha', () => {
         pityCount = 0
       } else {
         let weights = { ...ticket.rarityWeights }
+        weights = detectorStore.applySpecificRarityBoost(rarity, weights) || weights
 
         if (pityConfig.enabled && pityCount >= pityConfig.softPityStart) {
           const multiplier = pityConfig.softPityMultiplier
@@ -138,6 +141,7 @@ export const useGachaStore = defineStore('gacha', () => {
         }
 
         rarity = rollRarityByWeights(weights)
+        rarity = detectorStore.applyRarityBoost(rarity)
 
         if (pityConfig.enabled) {
           const rLevel = getRarityLevel(rarity)

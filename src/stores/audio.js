@@ -176,6 +176,65 @@ export const useAudioStore = defineStore('audio', () => {
     playTone(330, 0.05, 'triangle', 0.2)
   }
 
+  const playQuizStart = () => {
+    initAudioContext()
+    playTone(523.25, 0.1, 'sine', 0.4)
+    setTimeout(() => playTone(659.25, 0.1, 'sine', 0.4), 100)
+    setTimeout(() => playTone(783.99, 0.15, 'sine', 0.4), 200)
+    setTimeout(() => playTone(1046.50, 0.2, 'sine', 0.5), 300)
+  }
+
+  const playQuizCorrect = () => {
+    initAudioContext()
+    const notes = [659.25, 783.99, 1046.50]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.12, 'sine', 0.5), i * 80)
+    })
+  }
+
+  const playQuizWrong = () => {
+    initAudioContext()
+    playTone(300, 0.15, 'sawtooth', 0.3)
+    setTimeout(() => playTone(200, 0.2, 'sawtooth', 0.3), 120)
+  }
+
+  const playQuizStreak = (level) => {
+    initAudioContext()
+    const baseNotes = [523.25, 659.25, 783.99, 1046.50, 1318.51]
+    const count = Math.min(level, 5)
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => playTone(baseNotes[i], 0.12, 'sine', 0.5), i * 60)
+    }
+    setTimeout(() => playTone(1567.98, 0.3, 'sine', 0.6), count * 60)
+  }
+
+  const playQuizTimeout = () => {
+    initAudioContext()
+    playTone(440, 0.1, 'square', 0.3)
+    setTimeout(() => playTone(330, 0.1, 'square', 0.3), 100)
+    setTimeout(() => playTone(220, 0.2, 'square', 0.3), 200)
+  }
+
+  const playQuizComplete = () => {
+    initAudioContext()
+    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.18, 'sine', 0.5), i * 100)
+    })
+  }
+
+  const playQuizShopBuy = () => {
+    initAudioContext()
+    playTone(783.99, 0.08, 'sine', 0.4)
+    setTimeout(() => playTone(1046.50, 0.08, 'sine', 0.4), 80)
+    setTimeout(() => playTone(1318.51, 0.15, 'sine', 0.5), 160)
+  }
+
+  const playQuizTick = () => {
+    initAudioContext()
+    playTone(880, 0.03, 'square', 0.15)
+  }
+
   const startBackgroundMusic = () => {
     if (!soundEnabled.value || !musicEnabled.value || !audioContext.value) return
     if (backgroundOscillator.value) return
@@ -302,6 +361,14 @@ export const useAudioStore = defineStore('audio', () => {
     playLevelUp,
     playStaminaLow,
     playExploreStep,
+    playQuizStart,
+    playQuizCorrect,
+    playQuizWrong,
+    playQuizStreak,
+    playQuizTimeout,
+    playQuizComplete,
+    playQuizShopBuy,
+    playQuizTick,
     startBackgroundMusic,
     stopBackgroundMusic,
     toggleSound,

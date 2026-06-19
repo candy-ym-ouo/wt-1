@@ -42,6 +42,11 @@ const routes = [
     component: () => import('@/views/TaskCenterView.vue')
   },
   {
+    path: '/quiz',
+    name: 'Quiz',
+    component: () => import('@/views/QuizView.vue')
+  },
+  {
     path: '/mineral/:id',
     name: 'MineralDetail',
     component: () => import('@/views/MineralDetailView.vue')

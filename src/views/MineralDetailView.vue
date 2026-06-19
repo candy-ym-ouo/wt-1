@@ -214,6 +214,51 @@
         </div>
       </div>
 
+      <div class="discovery-history card" v-if="mineralDiscoveryLogs.length > 0">
+        <div class="history-header">
+          <h2 class="section-title">
+            <span class="title-icon">📜</span>
+            发现历史
+          </h2>
+          <span class="history-count">{{ mineralDiscoveryLogs.length }} 次记录</span>
+        </div>
+        <div class="history-timeline">
+          <div 
+            v-for="log in mineralDiscoveryLogs.slice(0, 5)" 
+            :key="log.id"
+            class="history-item"
+          >
+            <div class="history-dot" :style="{ background: log.sourceColor }">
+              <span class="dot-icon">{{ log.sourceIcon }}</span>
+            </div>
+            <div class="history-content">
+              <div class="history-top">
+                <span class="history-source" :style="{ color: log.sourceColor }">
+                  {{ log.sourceName }}
+                </span>
+                <span class="history-time">{{ formatHistoryTime(log.timestamp) }}</span>
+              </div>
+              <div class="history-events" v-if="log.keyEvents && log.keyEvents.length > 0">
+                <span v-for="(event, idx) in log.keyEvents" :key="idx" class="history-event">
+                  {{ event }}
+                </span>
+              </div>
+              <div class="history-rewards">
+                <span v-if="log.rewards.coins > 0" class="history-reward">
+                  💰 +{{ log.rewards.coins }}
+                </span>
+                <span v-if="log.rewards.exp > 0" class="history-reward">
+                  ⭐ +{{ log.rewards.exp }} EXP
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-if="mineralDiscoveryLogs.length > 5" class="history-more">
+          <span>还有 {{ mineralDiscoveryLogs.length - 5 }} 条记录...</span>
+        </div>
+      </div>
+
       <div class="action-section">
         <button class="btn btn-large" @click="collectAgain">
           <span class="btn-icon">🎨</span>
@@ -429,6 +474,27 @@ const mineralCount = computed(() => {
   const m = gameStore.collectedMinerals.find(m => m.id === mineral.value.id)
   return m?.count || 0
 })
+
+const mineralDiscoveryLogs = computed(() => {
+  if (!mineral.value) return []
+  return gameStore.getDiscoveryLogs({ mineralId: mineral.value.id })
+})
+
+const formatHistoryTime = (timestamp) => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins}分钟前`
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffDays < 7) return `${diffDays}天前`
+  
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
 
 const goToMarket = () => {
   audioStore.playClick()
@@ -1094,5 +1160,133 @@ onMounted(() => {
   .meta-item {
     padding: 6px 10px;
   }
+}
+
+.discovery-history {
+  margin: 0 16px 16px 16px;
+  padding: 20px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.history-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.history-timeline {
+  position: relative;
+  padding-left: 20px;
+}
+
+.history-timeline::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--primary), transparent);
+}
+
+.history-item {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.history-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.history-dot {
+  position: absolute;
+  left: -20px;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.history-dot .dot-icon {
+  font-size: 9px;
+}
+
+.history-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.history-source {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+.history-events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.history-event {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.history-rewards {
+  display: flex;
+  gap: 12px;
+}
+
+.history-reward {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.history-more {
+  text-align: center;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 </style>

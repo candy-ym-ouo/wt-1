@@ -40,6 +40,8 @@ export const useGameStore = defineStore('game', () => {
   const showRewardModal = ref(false)
   const expeditionHistory = ref([])
   const staminaRecoveryTimer = ref(null)
+  const discoveryLogs = ref([])
+  const MAX_LOGS = 200
 
   const onTaskEvent = ref(null)
 
@@ -78,11 +80,89 @@ export const useGameStore = defineStore('game', () => {
     return expeditionPhase.value === 'map' && stamina.value > 0
   })
 
+  const SOURCE_CONFIG = {
+    collage: { name: '拼装工坊', icon: '🎨', color: '#ec4899' },
+    expedition: { name: '探险发现', icon: '🗺️', color: '#3b82f6' },
+    market: { name: '市场购买', icon: '🏪', color: '#f59e0b' },
+    exchange: { name: '交换站', icon: '🔄', color: '#06b6d4' },
+    gacha: { name: '盲盒抽取', icon: '🎁', color: '#a855f7' },
+    season: { name: '赛季奖励', icon: '🏆', color: '#ef4444' },
+    quiz: { name: '问答解锁', icon: '❓', color: '#22c55e' }
+  }
+
+  const getSourceConfig = (source) => {
+    return SOURCE_CONFIG[source] || { name: source, icon: '📦', color: '#6b7280' }
+  }
+
+  const addDiscoveryLog = (mineral, source, sourceData, rewards, keyEvents = []) => {
+    const sourceConfig = getSourceConfig(source)
+    const logEntry = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      mineralId: mineral.id,
+      mineralName: mineral.name,
+      mineralEmoji: mineral.emoji,
+      rarity: mineral.rarity,
+      source,
+      sourceName: sourceConfig.name,
+      sourceIcon: sourceConfig.icon,
+      sourceColor: sourceConfig.color,
+      sourceData,
+      rewards: {
+        coins: rewards.coins || 0,
+        exp: rewards.exp || 0,
+        isNew: rewards.isNew || false
+      },
+      keyEvents,
+      timestamp: Date.now()
+    }
+
+    discoveryLogs.value.unshift(logEntry)
+    
+    if (discoveryLogs.value.length > MAX_LOGS) {
+      discoveryLogs.value = discoveryLogs.value.slice(0, MAX_LOGS)
+    }
+
+    saveProgress()
+    return logEntry
+  }
+
+  const getDiscoveryLogs = ({ source = null, rarity = null, mineralId = null, limit = null } = {}) => {
+    let logs = [...discoveryLogs.value]
+    
+    if (source) {
+      logs = logs.filter(l => l.source === source)
+    }
+    if (rarity) {
+      logs = logs.filter(l => l.rarity === rarity)
+    }
+    if (mineralId) {
+      logs = logs.filter(l => l.mineralId === mineralId)
+    }
+    if (limit) {
+      logs = logs.slice(0, limit)
+    }
+    
+    return logs
+  }
+
+  const getDiscoveryLogsByDate = () => {
+    const groups = {}
+    for (const log of discoveryLogs.value) {
+      const date = new Date(log.timestamp)
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(log)
+    }
+    return groups
+  }
+
   const isMineralCollected = (mineralId) => {
     return collectedMinerals.value.some(m => m.id === mineralId)
   }
 
-  const collectMineral = (mineral, source = 'collage', sourceData = {}) => {
+  const collectMineral = (mineral, source = 'collage', sourceData = {}, rewards = {}, keyEvents = []) => {
     const detectorStore = useDetectorStore()
     
     const sourceRecord = {
@@ -90,6 +170,9 @@ export const useGameStore = defineStore('game', () => {
       sourceData,
       obtainedAt: Date.now()
     }
+    
+    let isNew = false
+    let earnedCoins = 0
     
     if (!isMineralCollected(mineral.id)) {
       collectedMinerals.value.push({
@@ -102,7 +185,16 @@ export const useGameStore = defineStore('game', () => {
       
       const bonusCoins = detectorStore.applyCoinBonus(RARITY_CONFIG[mineral.rarity].starCount * 10)
       coins.value += bonusCoins
+      earnedCoins = bonusCoins
       emitTaskEvent('coinsEarned', bonusCoins)
+      
+      isNew = true
+      const events = ['首次发现！', ...keyEvents]
+      addDiscoveryLog(mineral, source, sourceData, {
+        coins: earnedCoins,
+        exp: rewards.exp || 0,
+        isNew: true
+      }, events)
       
       saveProgress()
       return true
@@ -125,9 +217,18 @@ export const useGameStore = defineStore('game', () => {
       const baseCoins = 10 * dropCount
       const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
       coins.value += bonusCoins
+      earnedCoins = bonusCoins
       
       emitTaskEvent('mineralCollected', mineral)
       emitTaskEvent('coinsEarned', bonusCoins)
+      
+      const events = dropCount > 1 ? [`多重掉落 x${dropCount}！`, ...keyEvents] : keyEvents
+      addDiscoveryLog(mineral, source, sourceData, {
+        coins: earnedCoins,
+        exp: rewards.exp || 0,
+        isNew: false
+      }, events)
+      
       saveProgress()
       return false
     }
@@ -270,6 +371,7 @@ export const useGameStore = defineStore('game', () => {
       expToNextLevel: expToNextLevel.value,
       lastStaminaRegen: lastStaminaRegen.value,
       expeditionHistory: expeditionHistory.value,
+      discoveryLogs: discoveryLogs.value,
       savedAt: Date.now()
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
@@ -371,6 +473,134 @@ export const useGameStore = defineStore('game', () => {
     return mockData
   }
 
+  const generateMockDiscoveryLogs = () => {
+    const mockLogs = []
+    const sourceTypes = ['collage', 'expedition', 'market', 'exchange', 'gacha', 'season', 'quiz']
+    const locations = EXPEDITION_LOCATIONS.map(l => ({ id: l.id, name: l.name }))
+    const boxTypes = ['basic', 'advanced', 'legendary']
+    const boxNames = ['普通盲盒', '高级盲盒', '传说盲盒']
+    const eventTemplates = [
+      '探测器升级生效！',
+      '幸运加成触发！',
+      '稀有度提升！',
+      '完美拼装！',
+      '意外发现！',
+      '专家级鉴定！'
+    ]
+    
+    const mineralsForLogs = [
+      { id: 15, rarity: 'legendary', count: 1 },
+      { id: 12, rarity: 'epic', count: 1 },
+      { id: 13, rarity: 'epic', count: 1 },
+      { id: 9, rarity: 'rare', count: 2 },
+      { id: 10, rarity: 'rare', count: 1 },
+      { id: 11, rarity: 'rare', count: 1 },
+      { id: 5, rarity: 'uncommon', count: 3 },
+      { id: 6, rarity: 'uncommon', count: 2 },
+      { id: 7, rarity: 'uncommon', count: 1 },
+      { id: 1, rarity: 'common', count: 5 },
+      { id: 2, rarity: 'common', count: 3 },
+      { id: 3, rarity: 'common', count: 2 },
+      { id: 4, rarity: 'common', count: 2 }
+    ]
+
+    let logTime = Date.now() - 7 * 24 * 60 * 60 * 1000
+
+    for (const item of mineralsForLogs) {
+      const mineralData = getMineralById(item.id)
+      if (!mineralData) continue
+
+      for (let i = 0; i < item.count; i++) {
+        const source = sourceTypes[Math.floor(Math.random() * sourceTypes.length)]
+        const sourceConfig = SOURCE_CONFIG[source]
+        let sourceData = {}
+        let keyEvents = []
+        
+        switch (source) {
+          case 'expedition':
+            const loc = locations[Math.floor(Math.random() * locations.length)]
+            sourceData = { ...loc, difficulty: Math.floor(Math.random() * 3) + 1 }
+            if (Math.random() < 0.3) keyEvents.push(eventTemplates[Math.floor(Math.random() * eventTemplates.length)])
+            break
+          case 'gacha':
+            const boxIndex = Math.floor(Math.random() * boxTypes.length)
+            const isPity = Math.random() < 0.1
+            sourceData = {
+              boxType: boxTypes[boxIndex],
+              boxName: boxNames[boxIndex],
+              isPity
+            }
+            if (isPity) keyEvents.push('保底触发！')
+            if (item.rarity === 'legendary') keyEvents.push('欧皇附体！')
+            break
+          case 'collage':
+            sourceData = { timeTaken: Math.floor(Math.random() * 60) + 20 }
+            if (Math.random() < 0.2) keyEvents.push(eventTemplates[3])
+            break
+          case 'exchange':
+            sourceData = {
+              type: 'rarity_conversion',
+              fromRarity: item.rarity,
+              coinCost: Math.floor(Math.random() * 500) + 100
+            }
+            break
+          case 'season':
+            const season = SEASONS[Math.floor(Math.random() * SEASONS.length)]
+            sourceData = {
+              type: 'pass_reward',
+              seasonId: season?.id,
+              seasonName: season?.name,
+              tier: Math.floor(Math.random() * 50) + 1
+            }
+            break
+          case 'quiz':
+            sourceData = {
+              type: 'reward_unlock',
+              rarity: item.rarity,
+              cost: Math.floor(Math.random() * 100) + 20
+            }
+            if (Math.random() < 0.3) keyEvents.push('全部答对！')
+            break
+          case 'market':
+            sourceData = {
+              price: Math.floor(Math.random() * 1000) + 100
+            }
+            break
+        }
+
+        const isFirst = i === 0
+        if (isFirst) keyEvents.unshift('首次发现！')
+
+        const hasMultiDrop = !isFirst && Math.random() < 0.2
+        if (hasMultiDrop) keyEvents.unshift('多重掉落 x2！')
+
+        mockLogs.push({
+          id: `log_mock_${mockLogs.length}`,
+          mineralId: mineralData.id,
+          mineralName: mineralData.name,
+          mineralEmoji: mineralData.emoji,
+          rarity: mineralData.rarity,
+          source,
+          sourceName: sourceConfig.name,
+          sourceIcon: sourceConfig.icon,
+          sourceColor: sourceConfig.color,
+          sourceData,
+          rewards: {
+            coins: Math.floor(Math.random() * 200) + 50,
+            exp: Math.floor(Math.random() * 50) + 10,
+            isNew: isFirst
+          },
+          keyEvents,
+          timestamp: logTime
+        })
+
+        logTime += Math.floor(Math.random() * 4 * 60 * 60 * 1000) + 30 * 60 * 1000
+      }
+    }
+
+    return mockLogs.sort((a, b) => b.timestamp - a.timestamp)
+  }
+
   const loadProgress = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -387,10 +617,12 @@ export const useGameStore = defineStore('game', () => {
         expToNextLevel.value = progress.expToNextLevel ?? 100
         lastStaminaRegen.value = progress.lastStaminaRegen || Date.now()
         expeditionHistory.value = progress.expeditionHistory || []
+        discoveryLogs.value = progress.discoveryLogs || []
         
         regenStamina()
       } else {
         collectedMinerals.value = generateMockCollectedMinerals()
+        discoveryLogs.value = generateMockDiscoveryLogs()
         coins.value = 5000
         totalCollages.value = 20
         saveProgress()
@@ -398,6 +630,7 @@ export const useGameStore = defineStore('game', () => {
     } catch (e) {
       console.error('Failed to load progress:', e)
       collectedMinerals.value = generateMockCollectedMinerals()
+      discoveryLogs.value = generateMockDiscoveryLogs()
       coins.value = 5000
     }
   }
@@ -421,6 +654,7 @@ export const useGameStore = defineStore('game', () => {
     expeditionRewards.value = null
     showRewardModal.value = false
     expeditionHistory.value = []
+    discoveryLogs.value = []
     localStorage.removeItem(STORAGE_KEY)
   }
 
@@ -691,6 +925,7 @@ export const useGameStore = defineStore('game', () => {
     expeditionRewards,
     showRewardModal,
     expeditionHistory,
+    discoveryLogs,
     allMinerals,
     allLocations,
     collectionProgress,
@@ -718,6 +953,10 @@ export const useGameStore = defineStore('game', () => {
     startExpedition,
     makeChoice,
     continueExpedition,
+    addDiscoveryLog,
+    getDiscoveryLogs,
+    getDiscoveryLogsByDate,
+    getSourceConfig,
     closeRewardModal,
     cancelExpedition,
     getLocation,

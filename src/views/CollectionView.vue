@@ -10,6 +10,16 @@
           <span class="tab-label">矿物图鉴</span>
         </button>
         <button 
+          :class="['tab-btn', { active: activeTab === 'log' }]"
+          @click="activeTab = 'log'"
+        >
+          <span class="tab-icon">📜</span>
+          <span class="tab-label">发现日志</span>
+          <span class="tab-badge" v-if="gameStore.discoveryLogs.length > 0">
+            {{ gameStore.discoveryLogs.length }}
+          </span>
+        </button>
+        <button 
           :class="['tab-btn', { active: activeTab === 'detector' }]"
           @click="activeTab = 'detector'"
         >
@@ -185,6 +195,16 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <div v-show="activeTab === 'log'">
+      <div class="log-header-section">
+        <div class="log-header-content">
+          <h1 class="page-title">📜 发现日志</h1>
+          <p class="page-subtitle">记录每一次矿物发现的精彩时刻</p>
+        </div>
+      </div>
+      <DiscoveryLog />
     </div>
 
     <div v-show="activeTab === 'detector'">
@@ -502,6 +522,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import MineralCard from '@/components/MineralCard.vue'
+import DiscoveryLog from '@/components/DiscoveryLog.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
@@ -1932,6 +1953,26 @@ const goToWarehouse = () => {
 
   .specific-rarity-card {
     grid-column: span 1;
+  }
+}
+
+.log-header-section {
+  margin-bottom: 20px;
+}
+
+.log-header-content {
+  text-align: center;
+  padding: 20px 0;
+}
+
+@media (max-width: 480px) {
+  .tabs-wrapper {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  
+  .tab-btn {
+    flex-shrink: 0;
   }
 }
 </style>

@@ -155,6 +155,51 @@ export const formatMessage = (template, vars) => {
   return result
 }
 
+export const COMBO_CONFIG = {
+  BASE_MULTIPLIER: 1,
+  PER_COMBO: 0.25,
+  MAX_MULTIPLIER: 3,
+  LABELS: {
+    1: '',
+    2: '连击 x2',
+    3: '连击 x3',
+    4: '四连击！',
+    5: '五连击！！',
+    6: '超神连击！！！'
+  },
+  COIN_BONUS_PER_COMBO: 0.15,
+  EXP_BONUS_PER_COMBO: 0.2
+}
+
+export const TIME_BONUS_CONFIG = {
+  SNIPER_WINDOW_MS: 5000,
+  SNIPER_COIN_BONUS: 0.1,
+  SNIPER_EXP_BONUS: 15,
+  LAST_SECOND_WINDOW_MS: 2000,
+  LAST_SECOND_COIN_BONUS: 0.2,
+  LAST_SECOND_EXP_BONUS: 30,
+  LABELS: {
+    sniper: '🎯 限时狙击',
+    lastSecond: '⚡ 绝杀出价'
+  }
+}
+
+export const SESSION_RATING_CONFIG = {
+  S: { minScore: 90, label: 'S', title: '拍卖大师', color: '#fbbf24', icon: '👑', coinBonus: 500, expBonus: 200 },
+  A: { minScore: 70, label: 'A', title: '竞价高手', color: '#a855f7', icon: '🏆', coinBonus: 300, expBonus: 120 },
+  B: { minScore: 50, label: 'B', title: '稳健竞拍者', color: '#3b82f6', icon: '🎖️', coinBonus: 150, expBonus: 60 },
+  C: { minScore: 30, label: 'C', title: '新手买家', color: '#22c55e', icon: '📜', coinBonus: 80, expBonus: 30 },
+  D: { minScore: 0, label: 'D', title: '观望者', color: '#9ca3af', icon: '📝', coinBonus: 30, expBonus: 10 }
+}
+
+export const SESSION_SCORE_WEIGHTS = {
+  WIN_RATE: 35,
+  COMBO_MAX: 20,
+  SPENDING_EFFICIENCY: 20,
+  TIME_BONUS_COUNT: 15,
+  RARITY_DIVERSITY: 10
+}
+
 export const getNPCMaxBidRatio = (bidder, rarity) => {
   const wealthMultiplier = {
     low: 1.0,

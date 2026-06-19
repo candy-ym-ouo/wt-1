@@ -83,22 +83,76 @@
         </div>
       </div>
     </div>
+
+    <div v-if="auctionStats.totalAuctions > 0" class="auction-stats-section">
+      <h3 class="ranking-title">🎪 拍卖会战绩</h3>
+      <div class="auction-stats-grid">
+        <div class="auction-stat-item">
+          <span class="auction-stat-icon">🎪</span>
+          <div class="auction-stat-content">
+            <span class="auction-stat-value">{{ auctionStats.totalAuctions }}</span>
+            <span class="auction-stat-label">参与场次</span>
+          </div>
+        </div>
+        <div class="auction-stat-item">
+          <span class="auction-stat-icon">🏆</span>
+          <div class="auction-stat-content">
+            <span class="auction-stat-value">{{ auctionStats.totalWins }}</span>
+            <span class="auction-stat-label">成功竞得</span>
+          </div>
+        </div>
+        <div class="auction-stat-item">
+          <span class="auction-stat-icon">🔥</span>
+          <div class="auction-stat-content">
+            <span class="auction-stat-value">{{ auctionStats.totalCombos }}</span>
+            <span class="auction-stat-label">累计连击</span>
+          </div>
+        </div>
+        <div v-if="auctionStats.bestRating !== 'D'" class="auction-stat-item rating-item" :style="{ borderLeftColor: auctionStats.bestRatingConfig.color }">
+          <span class="auction-stat-icon">{{ auctionStats.bestRatingConfig.icon }}</span>
+          <div class="auction-stat-content">
+            <span class="auction-stat-value" :style="{ color: auctionStats.bestRatingConfig.color }">{{ auctionStats.bestRating }}</span>
+            <span class="auction-stat-label">最佳评级</span>
+          </div>
+        </div>
+        <div class="auction-stat-item">
+          <span class="auction-stat-icon">🎯</span>
+          <div class="auction-stat-content">
+            <span class="auction-stat-value">{{ auctionStats.totalTimeBonuses }}</span>
+            <span class="auction-stat-label">限时加成</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { useMuseumStore } from '@/stores/museum'
+import { useAuctionStore } from '@/stores/auction'
+import { SESSION_RATING_CONFIG } from '@/data/auction'
 import RatingStars from './RatingStars.vue'
 import PopularityBadge from './PopularityBadge.vue'
 
 defineEmits(['viewMineral'])
 
 const museumStore = useMuseumStore()
+const auctionStore = useAuctionStore()
 
 const stats = computed(() => museumStore.museumStats)
 const topViewed = computed(() => museumStore.getTopViewedMinerals(5))
 const topRated = computed(() => museumStore.getTopRatedMinerals(5))
+
+const auctionStats = computed(() => ({
+  totalAuctions: auctionStore.totalAuctions,
+  totalWins: auctionStore.totalWins,
+  totalSpent: auctionStore.totalSpent,
+  bestRating: auctionStore.bestRating,
+  bestRatingConfig: SESSION_RATING_CONFIG[auctionStore.bestRating],
+  totalCombos: auctionStore.totalCombos,
+  totalTimeBonuses: auctionStore.totalTimeBonuses
+}))
 
 const formatNumber = (num) => {
   if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
@@ -281,6 +335,43 @@ const formatNumber = (num) => {
 }
 
 .rank-views {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.auction-stats-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.auction-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+.auction-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 12px;
+  border-left: 3px solid rgba(255,255,255,0.1);
+}
+.auction-stat-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.auction-stat-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.auction-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.auction-stat-label {
   font-size: 11px;
   color: var(--text-secondary);
 }

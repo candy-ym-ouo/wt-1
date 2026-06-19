@@ -235,6 +235,55 @@ export const useAudioStore = defineStore('audio', () => {
     playTone(880, 0.03, 'square', 0.15)
   }
 
+  const playAuctionWin = () => {
+    initAudioContext()
+    const notes = [523.25, 659.25, 783.99, 1046.50]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.15, 'sine', 0.5), i * 100)
+    })
+    setTimeout(() => playTone(1318.51, 0.4, 'sine', 0.6), 400)
+  }
+
+  const playAuctionLose = () => {
+    initAudioContext()
+    playTone(392, 0.15, 'triangle', 0.3)
+    setTimeout(() => playTone(349.23, 0.15, 'triangle', 0.3), 150)
+    setTimeout(() => playTone(329.63, 0.2, 'triangle', 0.3), 300)
+  }
+
+  const playComboHit = (level) => {
+    initAudioContext()
+    const baseFreq = 440 + Math.min(level, 6) * 80
+    const notes = [baseFreq, baseFreq * 1.25, baseFreq * 1.5]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.1, 'sine', 0.5), i * 60)
+    })
+    setTimeout(() => playTone(baseFreq * 2, 0.3, 'sine', 0.6), notes.length * 60)
+  }
+
+  const playSniperBid = () => {
+    initAudioContext()
+    playTone(880, 0.06, 'sine', 0.4)
+    setTimeout(() => playTone(1100, 0.06, 'sine', 0.4), 60)
+    setTimeout(() => playTone(1320, 0.12, 'sine', 0.5), 120)
+  }
+
+  const playRatingReveal = (rating) => {
+    initAudioContext()
+    const ratingFreq = { S: 1046.50, A: 783.99, B: 659.25, C: 523.25, D: 392 }
+    const base = ratingFreq[rating] || 523.25
+    const notes = [base * 0.5, base * 0.75, base, base * 1.25, base * 1.5]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.15, 'sine', 0.5), i * 120)
+    })
+    if (rating === 'S' || rating === 'A') {
+      setTimeout(() => {
+        playTone(base * 2, 0.4, 'sine', 0.7)
+        setTimeout(() => playTone(base * 2.5, 0.5, 'sine', 0.6), 200)
+      }, notes.length * 120)
+    }
+  }
+
   const startBackgroundMusic = () => {
     if (!soundEnabled.value || !musicEnabled.value || !audioContext.value) return
     if (backgroundOscillator.value) return
@@ -369,6 +418,11 @@ export const useAudioStore = defineStore('audio', () => {
     playQuizComplete,
     playQuizShopBuy,
     playQuizTick,
+    playAuctionWin,
+    playAuctionLose,
+    playComboHit,
+    playSniperBid,
+    playRatingReveal,
     startBackgroundMusic,
     stopBackgroundMusic,
     toggleSound,

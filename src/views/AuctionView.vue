@@ -34,6 +34,8 @@
             <div class="stat-chip"><span class="stat-icon">🎯</span><span class="stat-text">累计参与 {{ auctionStore.totalAuctions }} 场</span></div>
             <div class="stat-chip"><span class="stat-icon">🏆</span><span class="stat-text">成功竞得 {{ auctionStore.totalWins }} 件</span></div>
             <div class="stat-chip"><span class="stat-icon">💸</span><span class="stat-text">累计花费 {{ auctionStore.totalSpent.toLocaleString() }} 金</span></div>
+            <div class="stat-chip" v-if="auctionStore.bestRating !== 'D'"><span class="stat-icon">{{ SESSION_RATING_CONFIG[auctionStore.bestRating]?.icon || '📝' }}</span><span class="stat-text">历史最佳 {{ auctionStore.bestRating }} 级</span></div>
+            <div class="stat-chip" v-if="auctionStore.totalCombos > 0"><span class="stat-icon">🔥</span><span class="stat-text">累计连击 {{ auctionStore.totalCombos }} 次</span></div>
           </div>
           <div class="start-options">
             <button class="btn btn-primary btn-large" @click="startAuction(6)"><span class="btn-icon">🎬</span>开始拍卖会 (6轮)</button>
@@ -46,10 +48,29 @@
         <div class="finished-content">
           <div class="finished-icon">🎊</div>
           <h2 class="finished-title">拍卖会圆满结束</h2>
+
+          <div v-if="auctionStore.sessionRating" :class="['rating-section', { revealed: ratingRevealed }]">
+            <div class="rating-label">本场评级</div>
+            <div :class="['rating-badge', `rating-${auctionStore.sessionRating}`]" :style="{ '--rating-color': auctionStore.sessionRatingConfig.color }">
+              <span class="rating-icon">{{ auctionStore.sessionRatingConfig.icon }}</span>
+              <span class="rating-letter">{{ auctionStore.sessionRating }}</span>
+            </div>
+            <div class="rating-title">{{ auctionStore.sessionRatingConfig.title }}</div>
+            <div class="rating-score">综合评分 {{ auctionStore.sessionScore }}</div>
+            <div class="rating-rewards">
+              <span class="reward-item">💰 +{{ auctionStore.sessionRatingConfig.coinBonus }}</span>
+              <span class="reward-item">⭐ +{{ auctionStore.sessionRatingConfig.expBonus }} EXP</span>
+            </div>
+          </div>
+
           <div class="session-summary">
             <div class="summary-item"><span class="summary-icon">📦</span><span class="summary-label">总轮次</span><span class="summary-value">{{ auctionStore.progress.total }}</span></div>
             <div class="summary-item"><span class="summary-icon">🏆</span><span class="summary-label">本场收获</span><span class="summary-value">{{ sessionWins }} 件</span></div>
             <div class="summary-item"><span class="summary-icon">💸</span><span class="summary-label">本场花费</span><span class="summary-value">{{ sessionSpent.toLocaleString() }} 金</span></div>
+          </div>
+          <div class="session-bonus-stats">
+            <div class="bonus-stat-item"><span class="bonus-icon">🔥</span><span class="bonus-label">最高连击</span><span class="bonus-value">{{ auctionStore.maxCombo }} 连</span></div>
+            <div class="bonus-stat-item"><span class="bonus-icon">🎯</span><span class="bonus-label">限时加成</span><span class="bonus-value">{{ auctionStore.sessionTimeBonuses }} 次</span></div>
           </div>
           <div class="session-results" v-if="sessionResults.length > 0">
             <h3 class="results-title">本场成交记录</h3>
@@ -60,8 +81,13 @@
                   <span class="mineral-name">{{ result.mineral.name }}</span>
                   <span class="result-winner">{{ result.isPlayerWin ? '🎉 你竞得' : result.passed ? '😢 流拍' : `被 ${result.winnerName} 拍走` }}</span>
                 </div>
-                <span v-if="!result.passed" class="result-price">{{ result.finalPrice.toLocaleString() }} 💰</span>
-                <span v-else class="result-price passed">流拍</span>
+                <div class="result-badges">
+                  <span v-if="result.comboCount > 1" class="result-combo-badge">🔥x{{ result.comboCount }}</span>
+                  <span v-if="result.timeBonus === 'lastSecond'" class="result-time-badge last-second">⚡</span>
+                  <span v-else-if="result.timeBonus === 'sniper'" class="result-time-badge sniper">🎯</span>
+                  <span v-if="!result.passed" class="result-price">{{ result.finalPrice.toLocaleString() }} 💰</span>
+                  <span v-else class="result-price passed">流拍</span>
+                </div>
               </div>
             </div>
           </div>
@@ -80,6 +106,11 @@
             <span class="total-rounds">共 {{ auctionStore.progress.total }} 轮</span>
           </div>
           <div class="progress-bar-wrapper"><div class="progress-bar" :style="{ width: `${auctionStore.progress.percentage}%` }"></div></div>
+          <div v-if="auctionStore.comboCount > 1" :class="['combo-badge', { flash: comboFlash }]" :style="{ borderColor: `hsl(${30 + auctionStore.comboCount * 10}, 100%, 55%)` }">
+            <span class="combo-icon">🔥</span>
+            <span class="combo-text">{{ auctionStore.comboLabel }}</span>
+            <span class="combo-mult">x{{ auctionStore.comboMultiplier.toFixed(2) }}</span>
+          </div>
           <button v-if="auctionStore.phase === 'idle'" class="btn btn-small btn-primary" @click="auctionStore.startNextRound()">▶️ 开始</button>
         </div>
 
@@ -119,6 +150,10 @@
                 <div class="countdown-label">⏱️ 剩余时间</div>
                 <div class="countdown-value">{{ auctionStore.formatTimeRemaining(auctionStore.timeRemaining) }}</div>
                 <div class="countdown-bar-wrapper"><div class="countdown-bar" :style="{ width: countdownPercentage + '%' }"></div></div>
+                <div v-if="auctionStore.isClosingWarning" class="time-bonus-hint">
+                  <span v-if="auctionStore.timeRemaining <= TIME_BONUS_CONFIG.LAST_SECOND_WINDOW_MS">⚡ 绝杀出价双倍加成！</span>
+                  <span v-else>🎯 限时狙击加成中！</span>
+                </div>
               </div>
             </div>
           </div>
@@ -192,6 +227,8 @@
         <div class="archive-stat-card"><div class="archive-stat-icon">🎪</div><div class="archive-stat-info"><span class="archive-stat-label">参与场次</span><span class="archive-stat-value">{{ auctionStore.totalAuctions }}</span></div></div>
         <div class="archive-stat-card success"><div class="archive-stat-icon">🏆</div><div class="archive-stat-info"><span class="archive-stat-label">成功竞得</span><span class="archive-stat-value">{{ auctionStore.totalWins }}</span></div></div>
         <div class="archive-stat-card warning"><div class="archive-stat-icon">💸</div><div class="archive-stat-info"><span class="archive-stat-label">累计花费</span><span class="archive-stat-value">{{ auctionStore.totalSpent.toLocaleString() }}</span></div></div>
+        <div v-if="auctionStore.bestRating !== 'D'" class="archive-stat-card" :style="{ background: `linear-gradient(135deg, ${SESSION_RATING_CONFIG[auctionStore.bestRating]?.color}15, ${SESSION_RATING_CONFIG[auctionStore.bestRating]?.color}08)`, borderColor: `${SESSION_RATING_CONFIG[auctionStore.bestRating]?.color}40` }">
+          <div class="archive-stat-icon">{{ SESSION_RATING_CONFIG[auctionStore.bestRating]?.icon }}</div><div class="archive-stat-info"><span class="archive-stat-label">历史最佳评级</span><span class="archive-stat-value" :style="{ color: SESSION_RATING_CONFIG[auctionStore.bestRating]?.color }">{{ auctionStore.bestRating }}</span></div></div>
       </div>
       <div class="archive-tabs">
         <button v-for="tab in archiveTabs" :key="tab.value" :class="['archive-tab', { active: archiveTab === tab.value }]" @click="archiveTab = tab.value">{{ tab.label }}<span class="tab-count" v-if="tab.count">({{ tab.count }})</span></button>
@@ -257,6 +294,14 @@
               <div v-if="!auctionStore.lastResult?.passed" class="result-price-row"><span class="result-price-label">成交价</span><span class="result-price-value">💰 {{ auctionStore.lastResult?.finalPrice?.toLocaleString() }}</span></div>
               <div class="result-winner-row" v-if="!auctionStore.lastResult?.passed"><span class="result-winner-label">得主</span><span class="result-winner-value">{{ auctionStore.lastResult?.isPlayerWin ? '你' : `${auctionStore.lastResult?.winnerAvatar} ${auctionStore.lastResult?.winnerName}` }}</span></div>
               <div class="result-bids-row"><span class="result-bids-label">竞价次数</span><span class="result-bids-value">{{ auctionStore.lastResult?.totalBids || 0 }} 次</span></div>
+              <div v-if="auctionStore.lastResult?.comboCount > 1" class="result-combo-row">
+                <span class="result-combo-label">连击加成</span>
+                <span class="result-combo-value">🔥 x{{ auctionStore.lastResult.comboCount }} (x{{ (1 + (auctionStore.lastResult.comboCount - 1) * 0.25).toFixed(2) }} 加成)</span>
+              </div>
+              <div v-if="auctionStore.lastResult?.timeBonus" class="result-time-row">
+                <span class="result-time-label">限时加成</span>
+                <span class="result-time-value">{{ auctionStore.lastResult.timeBonus === 'lastSecond' ? '⚡ 绝杀出价' : '🎯 限时狙击' }}</span>
+              </div>
               <div v-if="auctionStore.lastResult?.isPlayerWin" class="result-collection-note">✨ 已加入你的收藏，并获得探险经验！</div>
             </div>
             <div class="result-modal-footer">
@@ -282,7 +327,7 @@ import { useGameStore } from '@/stores/game'
 import { useAuctionStore } from '@/stores/auction'
 import { useAudioStore } from '@/stores/audio'
 import { RARITY_CONFIG, getRarityStars, RARITY } from '@/data/rarity'
-import { BID_QUICK_OPTIONS } from '@/data/auction'
+import { BID_QUICK_OPTIONS, TIME_BONUS_CONFIG, SESSION_RATING_CONFIG } from '@/data/auction'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -296,6 +341,8 @@ const toastMessage = ref('')
 const toastSuccess = ref(true)
 const expandedRecords = ref([])
 const isTyping = ref(false)
+const comboFlash = ref(false)
+const ratingRevealed = ref(false)
 let toastTimer = null
 let typingTimer = null
 
@@ -357,9 +404,17 @@ const calculateQuickBid = (percentage) => {
 
 const handleQuickBid = (percentage) => {
   audioStore.playClick?.()
+  const wasCombo = auctionStore.comboCount
   const result = auctionStore.placeQuickPlayerBid(percentage)
   showToast(result.message, result.success)
-  if (result.success) { audioStore.playSuccess?.(); triggerTyping() }
+  if (result.success) {
+    if (auctionStore.lastBidTimeBonus) {
+      audioStore.playSniperBid?.()
+    } else {
+      audioStore.playSuccess?.()
+    }
+    triggerTyping()
+  }
   else { audioStore.playError?.() }
 }
 
@@ -368,7 +423,15 @@ const handleCustomBid = () => {
   audioStore.playClick?.()
   const result = auctionStore.placePlayerBid(customBidAmount.value)
   showToast(result.message, result.success)
-  if (result.success) { customBidAmount.value = 0; audioStore.playSuccess?.(); triggerTyping() }
+  if (result.success) {
+    customBidAmount.value = 0
+    if (auctionStore.lastBidTimeBonus) {
+      audioStore.playSniperBid?.()
+    } else {
+      audioStore.playSuccess?.()
+    }
+    triggerTyping()
+  }
   else { audioStore.playError?.() }
 }
 
@@ -422,6 +485,34 @@ watch(() => auctionStore.currentBid, (newVal, oldVal) => {
 
 watch(() => auctionStore.currentRound, (newRound) => {
   if (newRound) customBidAmount.value = Math.round(newRound.startPrice * 1.1)
+})
+
+watch(() => auctionStore.comboCount, (newVal, oldVal) => {
+  if (newVal > oldVal && newVal > 1) {
+    comboFlash.value = true
+    audioStore.playComboHit?.(newVal)
+    setTimeout(() => { comboFlash.value = false }, 600)
+  }
+})
+
+watch(() => auctionStore.lastResult, (result) => {
+  if (result) {
+    if (result.isPlayerWin) {
+      audioStore.playAuctionWin?.()
+    } else if (!result.passed) {
+      audioStore.playAuctionLose?.()
+    }
+  }
+})
+
+watch(() => auctionStore.sessionRating, (rating) => {
+  if (rating && auctionStore.phase === 'finished') {
+    ratingRevealed.value = false
+    setTimeout(() => {
+      ratingRevealed.value = true
+      audioStore.playRatingReveal?.(rating)
+    }, 800)
+  }
 })
 
 onMounted(() => auctionStore.loadAuctionData())
@@ -681,10 +772,12 @@ onUnmounted(() => {
 .result-mineral-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .result-mineral-name { font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0; }
 .result-rarity-tag { align-self: flex-start; }
-.result-price-row, .result-winner-row, .result-bids-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.03); border-radius: 10px; margin-bottom: 8px; }
-.result-price-label, .result-winner-label, .result-bids-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.result-price-row, .result-winner-row, .result-bids-row, .result-combo-row, .result-time-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.03); border-radius: 10px; margin-bottom: 8px; }
+.result-price-label, .result-winner-label, .result-bids-label, .result-combo-label, .result-time-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
 .result-price-value { font-size: 24px; font-weight: 900; color: #fbbf24; }
 .result-winner-value, .result-bids-value { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.result-combo-value { font-size: 15px; font-weight: 700; color: #f59e0b; }
+.result-time-value { font-size: 15px; font-weight: 700; color: #a855f7; }
 .result-collection-note { margin-top: 16px; padding: 12px; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); border-radius: 10px; text-align: center; font-size: 13px; font-weight: 600; color: #22c55e; }
 .result-modal-footer { display: flex; justify-content: center; }
 .modal-enter-active, .modal-leave-active { transition: all 0.3s ease; }
@@ -697,4 +790,35 @@ onUnmounted(() => {
 .toast-leave-active { animation: toastOut 0.3s ease; }
 @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
 @keyframes toastOut { from { opacity: 1; transform: translateX(-50%) translateY(0); } to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+.combo-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(251,191,36,0.08)); border: 2px solid #f59e0b; border-radius: 20px; flex-shrink: 0; animation: comboIn 0.3s ease; }
+.combo-badge.flash { animation: comboFlash 0.6s ease; }
+@keyframes comboIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes comboFlash { 0%,100% { transform: scale(1); } 30% { transform: scale(1.15); } 60% { transform: scale(0.95); } }
+.combo-icon { font-size: 16px; }
+.combo-text { font-size: 13px; font-weight: 800; color: #fbbf24; }
+.combo-mult { font-size: 11px; font-weight: 700; color: #f59e0b; opacity: 0.8; }
+.time-bonus-hint { margin-top: 8px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; text-align: center; animation: bonusPulse 1s ease-in-out infinite; background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(139,92,246,0.1)); color: #c4b5fd; }
+@keyframes bonusPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+.rating-section { text-align: center; padding: 20px; margin-bottom: 20px; background: rgba(255,255,255,0.03); border-radius: 16px; border: 1px solid rgba(255,255,255,0.08); opacity: 0; transform: scale(0.8); transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.rating-section.revealed { opacity: 1; transform: scale(1); }
+.rating-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; font-weight: 600; }
+.rating-badge { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; border-radius: 16px; background: linear-gradient(135deg, var(--rating-color, #9ca3af), color-mix(in srgb, var(--rating-color, #9ca3af) 70%, white)); margin-bottom: 8px; }
+.rating-badge.rating-S { animation: ratingGlow 1.5s ease-in-out infinite; }
+@keyframes ratingGlow { 0%,100% { box-shadow: 0 0 15px rgba(251,191,36,0.3); } 50% { box-shadow: 0 0 35px rgba(251,191,36,0.6); } }
+.rating-icon { font-size: 28px; }
+.rating-letter { font-size: 36px; font-weight: 900; color: white; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.rating-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.rating-score { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+.rating-rewards { display: flex; justify-content: center; gap: 16px; }
+.reward-item { font-size: 14px; font-weight: 700; color: #fbbf24; padding: 4px 12px; background: rgba(251,191,36,0.1); border-radius: 8px; }
+.session-bonus-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.bonus-stat-item { display: flex; align-items: center; gap: 10px; padding: 14px; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.bonus-icon { font-size: 24px; }
+.bonus-label { font-size: 11px; color: var(--text-secondary); }
+.bonus-value { font-size: 16px; font-weight: 800; color: var(--text-primary); }
+.result-badges { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.result-combo-badge { display: inline-flex; align-items: center; padding: 2px 8px; background: rgba(245,158,11,0.2); border-radius: 6px; font-size: 11px; font-weight: 700; color: #fbbf24; }
+.result-time-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-size: 12px; }
+.result-time-badge.last-second { background: rgba(168,85,247,0.2); }
+.result-time-badge.sniper { background: rgba(59,130,246,0.2); }
 </style>

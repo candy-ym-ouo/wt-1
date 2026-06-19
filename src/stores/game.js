@@ -81,13 +81,21 @@ export const useGameStore = defineStore('game', () => {
     return collectedMinerals.value.some(m => m.id === mineralId)
   }
 
-  const collectMineral = (mineral) => {
+  const collectMineral = (mineral, source = 'collage', sourceData = {}) => {
     const detectorStore = useDetectorStore()
+    
+    const sourceRecord = {
+      source,
+      sourceData,
+      obtainedAt: Date.now()
+    }
+    
     if (!isMineralCollected(mineral.id)) {
       collectedMinerals.value.push({
         ...mineral,
         collectedAt: Date.now(),
-        count: 1
+        count: 1,
+        sources: [sourceRecord]
       })
       emitTaskEvent('mineralCollected', mineral)
       
@@ -102,6 +110,16 @@ export const useGameStore = defineStore('game', () => {
       
       const dropCount = detectorStore.rollMultiDropCount()
       existing.count += dropCount
+      
+      if (!existing.sources) {
+        existing.sources = []
+      }
+      for (let i = 0; i < dropCount; i++) {
+        existing.sources.push({
+          ...sourceRecord,
+          obtainedAt: Date.now() + i
+        })
+      }
       
       const baseCoins = 10 * dropCount
       const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
@@ -200,7 +218,9 @@ export const useGameStore = defineStore('game', () => {
     const detectorStore = useDetectorStore()
     const allPlaced = collagePieces.value.every(p => p.isPlaced)
     if (allPlaced && currentCollage.value) {
-      const isNew = collectMineral(currentCollage.value)
+      const isNew = collectMineral(currentCollage.value, 'collage', {
+        timeTaken: Math.floor(Math.random() * 60) + 30
+      })
       const baseCoins = RARITY_CONFIG[currentCollage.value.rarity].starCount * 20
       const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
       coins.value += bonusCoins
@@ -254,6 +274,59 @@ export const useGameStore = defineStore('game', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
   }
 
+  const generateMockCollectedMinerals = () => {
+    const mockData = []
+    const sourceTypes = ['collage', 'expedition', 'market']
+    const locations = EXPEDITION_LOCATIONS.map(l => ({ id: l.id, name: l.name }))
+    
+    const mineralsToAdd = [
+      { id: 1, count: 5, rarity: 'common' },
+      { id: 2, count: 3, rarity: 'common' },
+      { id: 3, count: 2, rarity: 'common' },
+      { id: 4, count: 4, rarity: 'common' },
+      { id: 5, count: 3, rarity: 'uncommon' },
+      { id: 6, count: 5, rarity: 'uncommon' },
+      { id: 7, count: 2, rarity: 'uncommon' },
+      { id: 8, count: 1, rarity: 'uncommon' },
+      { id: 9, count: 3, rarity: 'rare' },
+      { id: 10, count: 1, rarity: 'rare' },
+      { id: 11, count: 2, rarity: 'rare' },
+      { id: 12, count: 1, rarity: 'epic' },
+      { id: 13, count: 1, rarity: 'epic' },
+      { id: 15, count: 1, rarity: 'legendary' }
+    ]
+
+    for (const item of mineralsToAdd) {
+      const mineralData = getMineralById(item.id)
+      if (!mineralData) continue
+
+      const sources = []
+      for (let i = 0; i < item.count; i++) {
+        const source = sourceTypes[Math.floor(Math.random() * sourceTypes.length)]
+        const sourceData = source === 'expedition' 
+          ? { ...locations[Math.floor(Math.random() * locations.length)] }
+          : source === 'collage'
+          ? { timeTaken: Math.floor(Math.random() * 60) + 20 }
+          : {}
+        
+        sources.push({
+          source,
+          sourceData,
+          obtainedAt: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)
+        })
+      }
+
+      mockData.push({
+        ...mineralData,
+        collectedAt: Math.min(...sources.map(s => s.obtainedAt)),
+        count: item.count,
+        sources
+      })
+    }
+
+    return mockData
+  }
+
   const loadProgress = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -272,9 +345,16 @@ export const useGameStore = defineStore('game', () => {
         expeditionHistory.value = progress.expeditionHistory || []
         
         regenStamina()
+      } else {
+        collectedMinerals.value = generateMockCollectedMinerals()
+        coins.value = 5000
+        totalCollages.value = 20
+        saveProgress()
       }
     } catch (e) {
       console.error('Failed to load progress:', e)
+      collectedMinerals.value = generateMockCollectedMinerals()
+      coins.value = 5000
     }
   }
 
@@ -475,7 +555,12 @@ export const useGameStore = defineStore('game', () => {
         if (mineral) {
           mineralCount = detectorStore.rollMultiDropCount()
           for (let i = 0; i < mineralCount; i++) {
-            isNew = collectMineral(mineral) || isNew
+            isNew = collectMineral(mineral, 'expedition', {
+              locationId: expedition.id,
+              locationName: expedition.name,
+              difficulty: expedition.difficulty,
+              eventResult: eventResult.value?.choice || 'standard'
+            }) || isNew
           }
         }
       }

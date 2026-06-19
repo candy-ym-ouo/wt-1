@@ -69,6 +69,10 @@
       </div>
 
       <div class="action-bar">
+        <button class="btn btn-small warehouse-entry-btn" @click="goToWarehouse">
+          <span class="btn-icon">🏭</span>
+          仓储管理
+        </button>
         <button class="btn btn-small" @click="goToMarket">
           <span class="btn-icon">🏪</span>
           前往市场
@@ -713,6 +717,11 @@ const viewSeasonSpecimen = (specimen) => {
   audioStore.playClick()
   router.push(`/mineral/${specimen.id}`)
 }
+
+const goToWarehouse = () => {
+  audioStore.playClick()
+  router.push('/warehouse')
+}
 </script>
 
 <style scoped>
@@ -1225,6 +1234,15 @@ const viewSeasonSpecimen = (specimen) => {
 
 .exchange-entry-btn:hover {
   box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
+}
+
+.warehouse-entry-btn {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+}
+
+.warehouse-entry-btn:hover {
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
 }
 
 .btn-icon {

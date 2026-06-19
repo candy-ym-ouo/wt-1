@@ -60,6 +60,11 @@ const routes = [
     path: '/mineral/:id',
     name: 'MineralDetail',
     component: () => import('@/views/MineralDetailView.vue')
+  },
+  {
+    path: '/warehouse',
+    name: 'Warehouse',
+    component: () => import('@/views/WarehouseView.vue')
   }
 ]
 

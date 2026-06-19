@@ -446,7 +446,6 @@ import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useMarketStore } from '@/stores/market'
 import { useAudioStore } from '@/stores/audio'
-import { useTaskStore } from '@/stores/task'
 import { RARITY_CONFIG, getRarityStars, RARITY } from '@/data/rarity'
 import { MINERALS, getMineralById } from '@/data/minerals'
 
@@ -454,7 +453,6 @@ const router = useRouter()
 const gameStore = useGameStore()
 const marketStore = useMarketStore()
 const audioStore = useAudioStore()
-const taskStore = useTaskStore()
 
 const activeTab = ref('market')
 const rarityFilter = ref('all')
@@ -646,7 +644,6 @@ const confirmBid = () => {
   
   if (result.success) {
     audioStore.playSuccess()
-    taskStore.onMarketBid()
     closeBidModal()
   } else {
     audioStore.playError()

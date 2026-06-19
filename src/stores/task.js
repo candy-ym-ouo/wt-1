@@ -6,6 +6,23 @@ import { useGameStore } from './game'
 
 const STORAGE_KEY = 'mineral_task_center_data'
 
+const DEFAULT_DAILY_STATS = {
+  expeditionsToday: 0,
+  mineralsCollectedToday: 0,
+  collagesToday: 0,
+  bidsToday: 0,
+  staminaSpentToday: 0
+}
+
+const DEFAULT_WEEKLY_STATS = {
+  expeditionsThisWeek: 0,
+  mineralsCollectedThisWeek: 0,
+  collagesThisWeek: 0,
+  coinsEarnedThisWeek: 0,
+  rareMineralsThisWeek: 0,
+  marketTransactionsThisWeek: 0
+}
+
 const getDayKey = (date = new Date()) => {
   const d = new Date(date)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -40,7 +57,6 @@ export const useTaskStore = defineStore('task', () => {
   const currentWeekKey = computed(() => getWeekKey())
 
   const dailyTasks = computed(() => {
-    checkDailyReset()
     return DAILY_TASKS.map(task => {
       const progress = dailyProgress.value[task.id] || 0
       const isComplete = progress >= task.target
@@ -56,7 +72,6 @@ export const useTaskStore = defineStore('task', () => {
   })
 
   const weeklyGoals = computed(() => {
-    checkWeeklyReset()
     return WEEKLY_GOALS.map(task => {
       const progress = weeklyProgress.value[task.id] || 0
       const isComplete = progress >= task.target
@@ -159,16 +174,12 @@ export const useTaskStore = defineStore('task', () => {
     if (lastDailyReset.value !== today) {
       dailyProgress.value = {}
       dailyClaimed.value = {}
-      dailyStats.value = {
-        expeditionsToday: 0,
-        mineralsCollectedToday: 0,
-        collagesToday: 0,
-        bidsToday: 0,
-        staminaSpentToday: 0
-      }
+      dailyStats.value = { ...DEFAULT_DAILY_STATS }
       lastDailyReset.value = today
       saveTaskData()
+      return true
     }
+    return false
   }
 
   const checkWeeklyReset = () => {
@@ -176,17 +187,12 @@ export const useTaskStore = defineStore('task', () => {
     if (lastWeeklyReset.value !== week) {
       weeklyProgress.value = {}
       weeklyClaimed.value = {}
-      weeklyStats.value = {
-        expeditionsThisWeek: 0,
-        mineralsCollectedThisWeek: 0,
-        collagesThisWeek: 0,
-        coinsEarnedThisWeek: 0,
-        rareMineralsThisWeek: 0,
-        marketTransactionsThisWeek: 0
-      }
+      weeklyStats.value = { ...DEFAULT_WEEKLY_STATS }
       lastWeeklyReset.value = week
       saveTaskData()
+      return true
     }
+    return false
   }
 
   const updateDailyProgress = (taskId, value) => {
@@ -407,14 +413,16 @@ export const useTaskStore = defineStore('task', () => {
         achievementClaimed.value = data.achievementClaimed || {}
         lastDailyReset.value = data.lastDailyReset || ''
         lastWeeklyReset.value = data.lastWeeklyReset || ''
-        dailyStats.value = data.dailyStats || {}
-        weeklyStats.value = data.weeklyStats || {}
+        dailyStats.value = { ...DEFAULT_DAILY_STATS, ...(data.dailyStats || {}) }
+        weeklyStats.value = { ...DEFAULT_WEEKLY_STATS, ...(data.weeklyStats || {}) }
         totalCoinsEarned.value = data.totalCoinsEarned || 0
         totalExpeditions.value = data.totalExpeditions || 0
         totalMarketTransactions.value = data.totalMarketTransactions || 0
       }
-      checkDailyReset()
-      checkWeeklyReset()
+      const dailyReset = checkDailyReset()
+      const weeklyReset = checkWeeklyReset()
+      if (!dailyReset) recalculateDailyProgress()
+      if (!weeklyReset) recalculateWeeklyProgress()
     } catch (e) {
       console.error('Failed to load task data:', e)
     }
@@ -426,14 +434,22 @@ export const useTaskStore = defineStore('task', () => {
     dailyClaimed.value = {}
     weeklyClaimed.value = {}
     achievementClaimed.value = {}
-    dailyStats.value = {}
-    weeklyStats.value = {}
+    dailyStats.value = { ...DEFAULT_DAILY_STATS }
+    weeklyStats.value = { ...DEFAULT_WEEKLY_STATS }
     totalCoinsEarned.value = 0
     totalExpeditions.value = 0
     totalMarketTransactions.value = 0
     lastDailyReset.value = ''
     lastWeeklyReset.value = ''
     localStorage.removeItem(STORAGE_KEY)
+  }
+
+  const checkResets = () => {
+    const dailyReset = checkDailyReset()
+    const weeklyReset = checkWeeklyReset()
+    if (dailyReset) recalculateDailyProgress()
+    if (weeklyReset) recalculateWeeklyProgress()
+    return dailyReset || weeklyReset
   }
 
   return {
@@ -478,6 +494,7 @@ export const useTaskStore = defineStore('task', () => {
     saveTaskData,
     loadTaskData,
     resetTaskData,
+    checkResets,
     getAchievementStats
   }
 })

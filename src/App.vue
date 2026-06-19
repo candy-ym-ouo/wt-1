@@ -118,12 +118,16 @@ onMounted(() => {
       case 'marketTransaction':
         taskStore.onMarketTransaction(payload)
         break
+      case 'marketBid':
+        taskStore.onMarketBid()
+        break
     }
   }
   
   marketUpdateTimer.value = setInterval(() => {
     marketStore.checkAllAuctions()
     marketStore.simulateNPCBids()
+    taskStore.checkResets()
   }, 5000)
 })
 

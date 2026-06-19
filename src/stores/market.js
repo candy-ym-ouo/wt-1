@@ -184,6 +184,7 @@ export const useMarketStore = defineStore('market', () => {
     listing.currentPrice = bidAmount
     saveMarketData()
     gameStore.saveProgress()
+    gameStore.emitTaskEvent('marketBid', bidAmount)
     
     return { success: true, message: '出价成功' }
   }

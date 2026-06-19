@@ -265,12 +265,20 @@
               v-for="item in shopItems"
               :key="item.id"
               class="shop-item-card"
-              :class="{ disabled: quizStore.quizPoints < item.cost }"
+              :class="{ disabled: quizStore.quizPoints < item.cost, 'all-collected': item.type === 'unlock_mineral' && !hasUncollectedOfRarity(item.rarity) }"
             >
               <div class="shop-item-icon">{{ item.icon }}</div>
               <div class="shop-item-info">
                 <h3 class="shop-item-name">{{ item.name }}</h3>
                 <p class="shop-item-desc">{{ item.description }}</p>
+                <p v-if="item.type === 'unlock_mineral'" class="shop-item-collected">
+                  <span v-if="hasUncollectedOfRarity(item.rarity)">
+                    剩余未收集: {{ getUncollectedCount(item.rarity) }} 种
+                  </span>
+                  <span v-else class="all-collected-text">
+                    ✨ 已全部收集，兑换将获得 {{ Math.floor(item.cost * 0.8) }} 金币
+                  </span>
+                </p>
               </div>
               <div class="shop-item-cost">
                 <span class="cost-icon">⭐</span>
@@ -281,13 +289,20 @@
                 :disabled="quizStore.quizPoints < item.cost"
                 @click="handleBuyItem(item.id)"
               >
-                {{ quizStore.quizPoints >= item.cost ? '兑换' : '积分不足' }}
+                {{ quizStore.quizPoints >= item.cost ? (item.type === 'unlock_mineral' && !hasUncollectedOfRarity(item.rarity) ? '兑换金币' : '兑换') : '积分不足' }}
               </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <NewMineralModal
+      :show="showNewMineralModal"
+      :mineral="newMineral"
+      :is-new="isNewMineral"
+      @close="handleCloseNewMineral"
+    />
   </div>
 </template>
 
@@ -301,6 +316,7 @@ import {
   DIFFICULTY_CONFIG,
   REWARD_SHOP_ITEMS
 } from '@/data/quiz'
+import NewMineralModal from '@/components/NewMineralModal.vue'
 
 const gameStore = useGameStore()
 const quizStore = useQuizStore()
@@ -309,6 +325,10 @@ const audioStore = useAudioStore()
 const difficultyList = computed(() => DIFFICULTY_CONFIG)
 const shopItems = computed(() => REWARD_SHOP_ITEMS)
 let tickInterval = null
+
+const showNewMineralModal = computed(() => gameStore.showNewMineralModal)
+const newMineral = computed(() => gameStore.newMineral)
+const isNewMineral = computed(() => gameStore.isNewMineral)
 
 onMounted(() => {
   quizStore.loadProgress()
@@ -391,14 +411,11 @@ const handleBuyItem = (itemId) => {
   const result = quizStore.purchaseReward(itemId)
   if (result.success) {
     audioStore.playQuizShopBuy()
-    if (result.unlockedMineral) {
+    if (result.item.type === 'unlock_mineral') {
       if (result.isNewMineral) {
         audioStore.playRareFound()
-        setTimeout(() => {
-          gameStore.newMineral = result.unlockedMineral
-          gameStore.isNewMineral = true
-          gameStore.showNewMineralModal = true
-        }, 500)
+      } else if (result.allCollected) {
+        audioStore.playSuccess()
       } else {
         audioStore.playSuccess()
       }
@@ -408,6 +425,18 @@ const handleBuyItem = (itemId) => {
   } else {
     audioStore.playError()
   }
+}
+
+const handleCloseNewMineral = () => {
+  gameStore.closeNewMineralModal()
+}
+
+const hasUncollectedOfRarity = (rarity) => {
+  return quizStore.hasUncollectedMineralsOfRarity(rarity)
+}
+
+const getUncollectedCount = (rarity) => {
+  return quizStore.getUncollectedCountOfRarity(rarity)
 }
 
 const getOptionClass = (optionId) => {
@@ -1331,6 +1360,22 @@ const getResultTitle = () => {
   font-size: 12px;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.shop-item-collected {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 4px 0 0 0;
+}
+
+.all-collected-text {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.shop-item-card.all-collected {
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.05);
 }
 
 .shop-item-cost {

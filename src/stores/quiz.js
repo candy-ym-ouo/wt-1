@@ -7,7 +7,7 @@ import {
   REWARD_SHOP_ITEMS,
   getRewardItemById
 } from '@/data/quiz'
-import { getRandomMineralByRarity } from '@/data/minerals'
+import { getRandomMineralByRarity, getRandomUncollectedMineralByRarity, getMineralsByRarity } from '@/data/minerals'
 import { useGameStore } from './game'
 
 const STORAGE_KEY = 'mineral_quiz_progress'
@@ -249,7 +249,7 @@ export const useQuizStore = defineStore('quiz', () => {
 
     quizPoints.value -= item.cost
 
-    let result = { success: true, item, unlockedMineral: null }
+    let result = { success: true, item, unlockedMineral: null, bonusCoins: 0 }
 
     switch (item.type) {
       case 'stamina':
@@ -260,7 +260,9 @@ export const useQuizStore = defineStore('quiz', () => {
         gameStore.emitTaskEvent('coinsEarned', item.value)
         break
       case 'unlock_mineral':
-        const mineral = getRandomMineralByRarity(item.rarity)
+        const collectedIds = new Set(gameStore.collectedMinerals.map(m => m.id))
+        let mineral = getRandomUncollectedMineralByRarity(item.rarity, collectedIds)
+        
         if (mineral) {
           const isNew = gameStore.collectMineral(mineral)
           result.unlockedMineral = mineral
@@ -270,7 +272,19 @@ export const useQuizStore = defineStore('quiz', () => {
               mineralId: mineral.id,
               unlockedAt: Date.now()
             })
+            gameStore.newMineral = mineral
+            gameStore.isNewMineral = true
+            gameStore.showNewMineralModal = true
           }
+        } else {
+          const allMineralsOfRarity = getRandomMineralByRarity(item.rarity)
+          const basePrice = allMineralsOfRarity ? Math.floor(item.cost * 0.8) : Math.floor(item.cost * 0.5)
+          gameStore.coins += basePrice
+          gameStore.emitTaskEvent('coinsEarned', basePrice)
+          result.bonusCoins = basePrice
+          result.allCollected = true
+          result.unlockedMineral = allMineralsOfRarity
+          result.isNewMineral = false
         }
         break
     }
@@ -285,6 +299,18 @@ export const useQuizStore = defineStore('quiz', () => {
 
   const closeShop = () => {
     showShopModal.value = false
+  }
+
+  const hasUncollectedMineralsOfRarity = (rarity) => {
+    const collectedIds = new Set(gameStore.collectedMinerals.map(m => m.id))
+    const allMineralsOfRarity = getMineralsByRarity(rarity)
+    return allMineralsOfRarity.some(m => !collectedIds.has(m.id))
+  }
+
+  const getUncollectedCountOfRarity = (rarity) => {
+    const collectedIds = new Set(gameStore.collectedMinerals.map(m => m.id))
+    const allMineralsOfRarity = getMineralsByRarity(rarity)
+    return allMineralsOfRarity.filter(m => !collectedIds.has(m.id)).length
   }
 
   const saveProgress = () => {
@@ -363,6 +389,8 @@ export const useQuizStore = defineStore('quiz', () => {
     purchaseReward,
     openShop,
     closeShop,
+    hasUncollectedMineralsOfRarity,
+    getUncollectedCountOfRarity,
     saveProgress,
     loadProgress,
     resetProgress

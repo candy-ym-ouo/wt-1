@@ -285,3 +285,14 @@ export const getRandomMineralByRarity = (rarity) => {
   const minerals = getMineralsByRarity(rarity)
   return minerals[Math.floor(Math.random() * minerals.length)]
 }
+
+export const getUncollectedMineralsByRarity = (rarity, collectedIds) => {
+  const minerals = getMineralsByRarity(rarity)
+  return minerals.filter(m => !collectedIds.has(m.id))
+}
+
+export const getRandomUncollectedMineralByRarity = (rarity, collectedIds) => {
+  const uncollected = getUncollectedMineralsByRarity(rarity, collectedIds)
+  if (uncollected.length === 0) return null
+  return uncollected[Math.floor(Math.random() * uncollected.length)]
+}

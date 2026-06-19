@@ -131,6 +131,7 @@
               :mineral="mineral"
               :is-collected="isMineralCollected(mineral.id)"
               :show-stats="true"
+              :is-favorite="museumStore.isFavorite(mineral.id)"
               @click="viewMineral"
             />
           </div>
@@ -179,6 +180,7 @@
               :mineral="mineral"
               :is-collected="isMineralCollected(mineral.id)"
               :show-stats="true"
+              :is-favorite="museumStore.isFavorite(mineral.id)"
               @click="viewMineral"
             />
           </div>

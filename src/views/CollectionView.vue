@@ -269,6 +269,7 @@
             :glow="isMineralCollected(mineral.id) && mineral.rarity === 'legendary'"
             :knowledge-card-count="getMineralUnlockedCardCount(mineral.id)"
             :total-knowledge-cards="getMineralTotalCardCount(mineral.id)"
+            :is-favorite="museumStore.isFavorite(mineral.id)"
             @click="viewMineralDetail"
           />
         </div>
@@ -653,6 +654,7 @@ import { useMarketStore } from '@/stores/market'
 import { useSeasonStore } from '@/stores/season'
 import { useDetectorStore } from '@/stores/detector'
 import { useResearchStore } from '@/stores/research'
+import { useMuseumStore } from '@/stores/museum'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { 
   MINERALS, 
@@ -677,6 +679,7 @@ const marketStore = useMarketStore()
 const seasonStore = useSeasonStore()
 const detectorStore = useDetectorStore()
 const researchStore = useResearchStore()
+const museumStore = useMuseumStore()
 
 const activeTab = ref('collection')
 const toastMessage = ref('')

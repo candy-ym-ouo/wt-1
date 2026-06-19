@@ -3,7 +3,7 @@
     class="mineral-card"
     :class="[
       `rarity-${mineral.rarity}`,
-      { collected: isCollected, locked: !isCollected && !showLocked }
+      { collected: isCollected, locked: !isCollected && !showLocked, 'is-favorite': isFavorite }
     ]"
     :style="cardStyle"
     @click="handleClick"
@@ -14,7 +14,9 @@
         <span class="mineral-emoji" :class="{ 'animate-float': isCollected }">
           {{ displayEmoji }}
         </span>
-        <span class="rarity-stars">{{ stars }}</span>
+        <div class="header-right">
+          <span class="rarity-stars">{{ stars }}</span>
+        </div>
       </div>
       <div class="card-body">
         <h3 class="mineral-name">{{ displayName }}</h3>
@@ -38,6 +40,13 @@
     >
       <span class="kb-icon">📇</span>
       <span class="kb-count">{{ knowledgeCardCount }}</span>
+    </div>
+    <div
+      v-if="showFavoriteBadge && isFavorite"
+      class="favorite-badge"
+      title="我的收藏"
+    >
+      <span class="fav-icon">❤️</span>
     </div>
   </div>
 </template>
@@ -78,6 +87,14 @@ const props = defineProps({
   totalKnowledgeCards: {
     type: Number,
     default: 0
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false
+  },
+  showFavoriteBadge: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -103,7 +120,9 @@ const cardStyle = computed(() => {
   if (props.isCollected) {
     return {
       background: rarityConfig.value.bgGradient,
-      borderColor: rarityConfig.value.borderColor
+      borderColor: props.isFavorite 
+        ? 'rgba(239, 68, 68, 0.6)' 
+        : rarityConfig.value.borderColor
     }
   }
   return {}
@@ -292,5 +311,42 @@ const handleClick = () => {
 @keyframes kbShine {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
+}
+
+.favorite-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(244, 63, 94, 0.95));
+  border: 1px solid rgba(252, 165, 165, 0.5);
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+  z-index: 2;
+  backdrop-filter: blur(4px);
+  animation: favPulse 2s ease-in-out infinite;
+}
+
+.fav-icon {
+  font-size: 12px;
+}
+
+@keyframes favPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.mineral-card.is-favorite {
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3), 0 8px 24px rgba(239, 68, 68, 0.15);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

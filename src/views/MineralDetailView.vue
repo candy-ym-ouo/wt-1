@@ -72,13 +72,127 @@
         </div>
         <div class="stat-item" v-if="collectedData">
           <span class="stat-icon">📅</span>
-          <span class="stat-label">收集时间</span>
+          <span class="stat-label">首次收集</span>
           <span class="stat-value">{{ formatDate(collectedData.collectedAt) }}</span>
         </div>
         <div class="stat-item" v-if="collectedData">
           <span class="stat-icon">🔄</span>
           <span class="stat-label">收集次数</span>
           <span class="stat-value">{{ collectedData.count }}次</span>
+        </div>
+        <div class="stat-item" v-if="lastCollageTime">
+          <span class="stat-icon">🎨</span>
+          <span class="stat-label">最近拼装</span>
+          <span class="stat-value">{{ formatRelativeTime(lastCollageTime) }}</span>
+        </div>
+        <div class="stat-item" v-if="isFav">
+          <span class="stat-icon">❤️</span>
+          <span class="stat-label">已收藏</span>
+          <span class="stat-value favorite">收藏中</span>
+        </div>
+      </div>
+
+      <div class="source-section card" v-if="sourceStats.length > 0">
+        <h2 class="section-title">
+          <span class="title-icon">📦</span>
+          来源记录
+        </h2>
+        <div class="source-stats">
+          <div 
+            v-for="stat in sourceStats" 
+            :key="stat.source"
+            class="source-stat-item"
+          >
+            <div class="source-stat-header">
+              <span class="source-stat-icon">{{ stat.icon }}</span>
+              <div class="source-stat-info">
+                <span class="source-stat-name">{{ stat.name }}</span>
+                <span class="source-stat-count">{{ stat.count }}次</span>
+              </div>
+            </div>
+            <div class="source-stat-bar">
+              <div 
+                class="source-stat-fill" 
+                :style="{ width: stat.percentage + '%', background: stat.color }"
+              ></div>
+            </div>
+          </div>
+        </div>
+        <div class="source-list" v-if="sources.length > 0">
+          <div class="source-list-header">
+            <span>获取明细（最近{{ Math.min(8, sources.length) }}条）</span>
+          </div>
+          <div class="source-timeline">
+            <div 
+              v-for="(src, idx) in sources.slice(0, 8)"
+              :key="idx"
+              class="source-timeline-item"
+            >
+              <div class="source-dot" :style="{ background: src.color }">
+                <span class="source-dot-icon">{{ src.icon }}</span>
+              </div>
+              <div class="source-content">
+                <div class="source-top">
+                  <span class="source-name" :style="{ color: src.color }">
+                    {{ src.name }}
+                  </span>
+                  <span class="source-time">{{ formatRelativeTime(src.obtainedAt) }}</span>
+                </div>
+                <div class="source-detail" v-if="src.detail">
+                  {{ src.detail }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="repeated-info card">
+        <div class="repeated-header">
+          <h2 class="section-title">
+            <span class="title-icon">💰</span>
+            重复收集收益
+          </h2>
+          <span class="repeated-tag">已重复收集 {{ Math.max(0, collectedData?.count - 1 || 0) }}次</span>
+        </div>
+        <div class="repeated-content">
+          <div class="repeated-desc">
+            <p>每次再次拼装或获取已收集矿物，可获得以下奖励：</p>
+          </div>
+          <div class="rewards-grid">
+            <div class="reward-item coin-reward">
+              <span class="reward-icon">🪙</span>
+              <div class="reward-info">
+                <span class="reward-label">基础金币</span>
+                <span class="reward-value">{{ repeatRewardInfo.baseCoins }} 金币/次</span>
+              </div>
+            </div>
+            <div class="reward-item bonus-reward" v-if="repeatRewardInfo.detectorBonus > 0">
+              <span class="reward-icon">🔧</span>
+              <div class="reward-info">
+                <span class="reward-label">探测器加成</span>
+                <span class="reward-value">+{{ repeatRewardInfo.detectorBonus.toFixed(0) }}%</span>
+              </div>
+            </div>
+            <div class="reward-item total-reward">
+              <span class="reward-icon">✨</span>
+              <div class="reward-info">
+                <span class="reward-label">预计总收益</span>
+                <span class="reward-value highlight">{{ repeatRewardInfo.totalPerRun }} 金币/次</span>
+              </div>
+            </div>
+            <div class="reward-item history-reward">
+              <span class="reward-icon">📊</span>
+              <div class="reward-info">
+                <span class="reward-label">累计已获得</span>
+                <span class="reward-value">{{ repeatRewardInfo.totalEarned }} 金币</span>
+              </div>
+            </div>
+          </div>
+          <div class="repeated-tip">
+            <span class="tip-icon">💡</span>
+            <span class="tip-text">提示：稀有度越高的矿物，重复收集获得的基础奖励越丰厚。升级探测器可获得更多金币加成！</span>
+          </div>
         </div>
       </div>
 
@@ -360,6 +474,7 @@ import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
 import { useMuseumStore } from '@/stores/museum'
 import { useResearchStore } from '@/stores/research'
+import { useDetectorStore } from '@/stores/detector'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 import { getMineralById } from '@/data/minerals'
 import { SEASONS } from '@/data/season'
@@ -375,6 +490,7 @@ const audioStore = useAudioStore()
 const marketStore = useMarketStore()
 const museumStore = useMuseumStore()
 const researchStore = useResearchStore()
+const detectorStore = useDetectorStore()
 
 const getAnyMineralById = (id) => {
   const numericId = Number(id)
@@ -489,6 +605,125 @@ const formatDate = (timestamp) => {
     day: 'numeric'
   })
 }
+
+const formatRelativeTime = (timestamp) => {
+  if (!timestamp) return '暂无'
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return '刚刚'
+  if (diffMins < 60) return `${diffMins}分钟前`
+  if (diffHours < 24) return `${diffHours}小时前`
+  if (diffDays < 7) return `${diffDays}天前`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`
+  
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
+const formatSourceDetail = (source, sourceData) => {
+  if (!sourceData) return ''
+  switch (source) {
+    case 'collage':
+      return sourceData.timeTaken ? `用时 ${sourceData.timeTaken}秒` : ''
+    case 'expedition':
+      return sourceData.locationName ? `${sourceData.locationName} · 难度${sourceData.difficulty || 1}` : ''
+    case 'gacha':
+      return sourceData.boxName ? `${sourceData.boxName}${sourceData.isPity ? ' · 保底' : ''}` : ''
+    case 'exchange':
+      return sourceData.coinCost ? `消耗 ${sourceData.coinCost} 金币` : ''
+    case 'season':
+      return sourceData.seasonName ? `${sourceData.seasonName} · 第${sourceData.tier || 1}级` : ''
+    case 'quiz':
+      return sourceData.cost ? `消耗 ${sourceData.cost} 知识点` : ''
+    case 'market':
+      return sourceData.price ? `花费 ${sourceData.price} 金币` : ''
+    case 'auction':
+      return sourceData.finalPrice ? `成交价 ${sourceData.finalPrice} 金币` : ''
+    case 'research':
+      return sourceData.stageName || ''
+    default:
+      return ''
+  }
+}
+
+const sources = computed(() => {
+  if (!collectedData.value?.sources) return []
+  return [...collectedData.value.sources]
+    .sort((a, b) => b.obtainedAt - a.obtainedAt)
+    .map(src => {
+      const config = gameStore.getSourceConfig(src.source)
+      return {
+        ...src,
+        name: config.name,
+        icon: config.icon,
+        color: config.color,
+        detail: formatSourceDetail(src.source, src.sourceData)
+      }
+    })
+})
+
+const sourceStats = computed(() => {
+  if (!collectedData.value?.sources || collectedData.value.sources.length === 0) return []
+  
+  const statMap = {}
+  for (const src of collectedData.value.sources) {
+    if (!statMap[src.source]) {
+      const config = gameStore.getSourceConfig(src.source)
+      statMap[src.source] = {
+        source: src.source,
+        name: config.name,
+        icon: config.icon,
+        color: config.color,
+        count: 0
+      }
+    }
+    statMap[src.source].count++
+  }
+  
+  const total = collectedData.value.sources.length
+  return Object.values(statMap)
+    .sort((a, b) => b.count - a.count)
+    .map(s => ({
+      ...s,
+      percentage: Math.round((s.count / total) * 100)
+    }))
+})
+
+const lastCollageTime = computed(() => {
+  if (!collectedData.value?.sources) return null
+  const collageSources = collectedData.value.sources.filter(s => s.source === 'collage')
+  if (collageSources.length === 0) return null
+  return Math.max(...collageSources.map(s => s.obtainedAt))
+})
+
+const repeatRewardInfo = computed(() => {
+  if (!mineral.value) return {
+    baseCoins: 0,
+    detectorBonus: 0,
+    totalPerRun: 0,
+    totalEarned: 0
+  }
+  
+  const starCount = RARITY_CONFIG[mineral.value.rarity]?.starCount || 1
+  const baseCoins = 10
+  const detectorBonus = (detectorStore.totalStats?.coinBonus) || 0
+  const bonusMultiplier = 1 + detectorBonus / 100
+  const totalPerRun = Math.floor(baseCoins * bonusMultiplier)
+  
+  const repeatCount = Math.max(0, (collectedData.value?.count || 1) - 1)
+  const totalEarned = repeatCount * totalPerRun
+  
+  return {
+    baseCoins,
+    detectorBonus,
+    totalPerRun,
+    totalEarned
+  }
+})
 
 const goBack = () => {
   audioStore.playClick()
@@ -1457,5 +1692,332 @@ onMounted(() => {
   opacity: 0.65;
   padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-value.favorite {
+  color: #ef4444;
+}
+
+.source-section {
+  margin: 0 16px 16px 16px;
+  padding: 20px;
+}
+
+.source-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.source-stat-item {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.source-stat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.source-stat-icon {
+  font-size: 24px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.source-stat-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.source-stat-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.source-stat-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.source-stat-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.source-stat-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.source-stat-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: sourceShimmer 2s infinite;
+}
+
+@keyframes sourceShimmer {
+  0% { background-position: -20px 0; }
+  100% { background-position: calc(100% + 20px) 0; }
+}
+
+.source-list-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.source-timeline {
+  position: relative;
+  padding-left: 22px;
+}
+
+.source-timeline::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(233, 69, 96, 0.5), rgba(168, 85, 247, 0.3), transparent);
+}
+
+.source-timeline-item {
+  position: relative;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.source-timeline-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.source-dot {
+  position: absolute;
+  left: -22px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.source-dot-icon {
+  font-size: 8px;
+}
+
+.source-content {
+  min-width: 0;
+}
+
+.source-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 8px;
+}
+
+.source-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.source-time {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+  flex-shrink: 0;
+}
+
+.source-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
+.repeated-info {
+  margin: 0 16px 16px 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(251, 191, 36, 0.04));
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.repeated-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.repeated-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.repeated-desc {
+  margin-bottom: 14px;
+}
+
+.repeated-desc p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.reward-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.coin-reward {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.05));
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.bonus-reward {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(14, 165, 233, 0.05));
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.total-reward {
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.12), rgba(168, 85, 247, 0.08));
+  border-color: rgba(233, 69, 96, 0.25);
+}
+
+.history-reward {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.05));
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.reward-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.reward-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reward-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.reward-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.reward-value.highlight {
+  color: #fbbf24;
+  font-size: 14px;
+}
+
+.repeated-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border-left: 3px solid #f59e0b;
+}
+
+.tip-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.tip-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+@media (max-width: 480px) {
+  .rewards-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .source-stat-header {
+    gap: 8px;
+  }
+  
+  .source-stat-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+  }
 }
 </style>

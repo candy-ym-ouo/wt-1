@@ -89,6 +89,7 @@
           :is-collected="true"
           :glow="mineral.rarity === 'legendary'"
           :show-stats="true"
+          :is-favorite="museumStore.isFavorite(mineral.id)"
           @click="viewMineralDetail"
         />
       </div>
@@ -142,12 +143,14 @@ import MineralCard from '@/components/MineralCard.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useTaskStore } from '@/stores/task'
+import { useMuseumStore } from '@/stores/museum'
 import { RARITY_CONFIG } from '@/data/rarity'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const taskStore = useTaskStore()
+const museumStore = useMuseumStore()
 
 const showResetConfirm = ref(false)
 

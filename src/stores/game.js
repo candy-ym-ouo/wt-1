@@ -42,6 +42,7 @@ export const useGameStore = defineStore('game', () => {
   const staminaRecoveryTimer = ref(null)
   const discoveryLogs = ref([])
   const MAX_LOGS = 200
+  const collageStartTime = ref(null)
 
   const onTaskEvent = ref(null)
 
@@ -173,6 +174,9 @@ export const useGameStore = defineStore('game', () => {
     
     let isNew = false
     let earnedCoins = 0
+    let extraCoins = rewards.coins || 0
+    let extraExp = rewards.exp || 0
+    let dropCount = 1
     
     if (!isMineralCollected(mineral.id)) {
       collectedMinerals.value.push({
@@ -183,16 +187,17 @@ export const useGameStore = defineStore('game', () => {
       })
       emitTaskEvent('mineralCollected', mineral)
       
-      const bonusCoins = detectorStore.applyCoinBonus(RARITY_CONFIG[mineral.rarity].starCount * 10)
+      const baseCoins = RARITY_CONFIG[mineral.rarity].starCount * 10
+      const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
       coins.value += bonusCoins
-      earnedCoins = bonusCoins
+      earnedCoins = bonusCoins + extraCoins
       emitTaskEvent('coinsEarned', bonusCoins)
       
       isNew = true
       const events = ['首次发现！', ...keyEvents]
       addDiscoveryLog(mineral, source, sourceData, {
         coins: earnedCoins,
-        exp: rewards.exp || 0,
+        exp: extraExp,
         isNew: true
       }, events)
       
@@ -201,7 +206,7 @@ export const useGameStore = defineStore('game', () => {
     } else {
       const existing = collectedMinerals.value.find(m => m.id === mineral.id)
       
-      const dropCount = detectorStore.rollMultiDropCount()
+      dropCount = detectorStore.rollMultiDropCount()
       existing.count += dropCount
       
       if (!existing.sources) {
@@ -217,7 +222,7 @@ export const useGameStore = defineStore('game', () => {
       const baseCoins = 10 * dropCount
       const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
       coins.value += bonusCoins
-      earnedCoins = bonusCoins
+      earnedCoins = bonusCoins + extraCoins
       
       emitTaskEvent('mineralCollected', mineral)
       emitTaskEvent('coinsEarned', bonusCoins)
@@ -225,7 +230,7 @@ export const useGameStore = defineStore('game', () => {
       const events = dropCount > 1 ? [`多重掉落 x${dropCount}！`, ...keyEvents] : keyEvents
       addDiscoveryLog(mineral, source, sourceData, {
         coins: earnedCoins,
-        exp: rewards.exp || 0,
+        exp: extraExp,
         isNew: false
       }, events)
       
@@ -249,6 +254,7 @@ export const useGameStore = defineStore('game', () => {
     currentCollage.value = targetMineral
     collagePieces.value = pieces
     totalCollages.value++
+    collageStartTime.value = Date.now()
 
     saveProgress()
     return { mineral: targetMineral, pieces }
@@ -320,22 +326,57 @@ export const useGameStore = defineStore('game', () => {
     const detectorStore = useDetectorStore()
     const allPlaced = collagePieces.value.every(p => p.isPlaced)
     if (allPlaced && currentCollage.value) {
-      const isNew = collectMineral(currentCollage.value, 'collage', {
-        timeTaken: Math.floor(Math.random() * 60) + 30
-      })
-      const baseCoins = RARITY_CONFIG[currentCollage.value.rarity].starCount * 20
-      const bonusCoins = detectorStore.applyCoinBonus(baseCoins)
-      coins.value += bonusCoins
-      emitTaskEvent('coinsEarned', bonusCoins)
+      const mineral = currentCollage.value
+      const now = Date.now()
+      const timeTaken = collageStartTime.value 
+        ? Math.max(1, Math.floor((now - collageStartTime.value) / 1000))
+        : Math.floor(Math.random() * 60) + 30
+      
+      const rarityConfig = RARITY_CONFIG[mineral.rarity]
+      const baseCollageCoins = rarityConfig.starCount * 20
+      const collageBonusCoins = detectorStore.applyCoinBonus(baseCollageCoins)
+      
+      const keyEvents = []
+      
+      if (timeTaken < 15) {
+        keyEvents.push('闪电速度！')
+      } else if (timeTaken < 30) {
+        keyEvents.push('快速拼装！')
+      }
+      
+      if (mineral.rarity === RARITY.LEGENDARY) {
+        keyEvents.push('传说矿物！')
+      } else if (mineral.rarity === RARITY.EPIC) {
+        keyEvents.push('史诗矿物！')
+      }
+      
+      const totalPieces = collagePieces.value.length
+      const baseExp = totalPieces * 5 + rarityConfig.starCount * 2
+      
+      const wasNew = collectMineral(mineral, 'collage', {
+        timeTaken
+      }, {
+        coins: collageBonusCoins,
+        exp: baseExp
+      }, keyEvents)
+      
+      coins.value += collageBonusCoins
+      emitTaskEvent('coinsEarned', collageBonusCoins)
+      
+      addExp(baseExp)
 
       completedCollages.value.push({
-        mineral: currentCollage.value,
-        completedAt: Date.now(),
-        timeTaken: Math.floor(Math.random() * 60) + 30
+        mineral,
+        completedAt: now,
+        timeTaken,
+        coins: collageBonusCoins,
+        exp: baseExp,
+        isNew: wasNew,
+        events: keyEvents
       })
 
-      newMineral.value = currentCollage.value
-      isNewMineral.value = isNew
+      newMineral.value = mineral
+      isNewMineral.value = wasNew
       showNewMineralModal.value = true
 
       emitTaskEvent('collageComplete')
@@ -351,11 +392,13 @@ export const useGameStore = defineStore('game', () => {
     newMineral.value = null
     currentCollage.value = null
     collagePieces.value = []
+    collageStartTime.value = null
   }
 
   const resetCurrentCollage = () => {
     currentCollage.value = null
     collagePieces.value = []
+    collageStartTime.value = null
   }
 
   const saveProgress = () => {
@@ -642,6 +685,7 @@ export const useGameStore = defineStore('game', () => {
     totalCollages.value = 0
     currentCollage.value = null
     collagePieces.value = []
+    collageStartTime.value = null
     stamina.value = 100
     maxStamina.value = 100
     expeditionLevel.value = 1
@@ -906,6 +950,7 @@ export const useGameStore = defineStore('game', () => {
     collectedMinerals,
     currentCollage,
     collagePieces,
+    collageStartTime,
     completedCollages,
     coins,
     totalCollages,

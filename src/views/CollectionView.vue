@@ -81,6 +81,30 @@
       </div>
     </div>
 
+    <div class="season-specimens-section" v-if="seasonLimitedSpecimens.length > 0">
+      <div class="section-header-row">
+        <h2 class="section-label">🔮 赛季限定标本</h2>
+        <button class="btn btn-small season-go-btn" @click="goToSeason">
+          查看赛季 →
+        </button>
+      </div>
+      <div class="season-specimens-row">
+        <div
+          v-for="specimen in seasonLimitedSpecimens"
+          :key="specimen.id"
+          class="season-specimen-card"
+          :class="{ collected: isSeasonSpecimenCollected(specimen.id), [`rarity-${specimen.rarity}`]: true }"
+          @click="viewSeasonSpecimen(specimen)"
+        >
+          <div class="specimen-exclusive-tag">限定</div>
+          <span class="specimen-emoji-small">{{ specimen.emoji }}</span>
+          <span class="specimen-name-small">{{ specimen.name }}</span>
+          <span class="specimen-status" v-if="!isSeasonSpecimenCollected(specimen.id)">🔒</span>
+          <span class="specimen-status collected-status" v-else>✓</span>
+        </div>
+      </div>
+    </div>
+
     <div class="minerals-container">
       <div v-if="filteredMinerals.length === 0" class="empty-state">
         <div class="empty-icon">🔍</div>
@@ -146,6 +170,7 @@ import MineralCard from '@/components/MineralCard.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
+import { useSeasonStore } from '@/stores/season'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { MINERALS } from '@/data/minerals'
 
@@ -153,6 +178,7 @@ const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
 const marketStore = useMarketStore()
+const seasonStore = useSeasonStore()
 
 const activeFilter = ref('all')
 const viewMode = ref('grid')
@@ -231,6 +257,26 @@ const listMineral = (mineral) => {
   setTimeout(() => {
     marketStore.openListModal(mineral)
   }, 100)
+}
+
+const seasonLimitedSpecimens = computed(() => seasonStore.limitedSpecimens)
+
+const isSeasonSpecimenCollected = (specimenId) => {
+  return seasonStore.collectedSpecimens.includes(specimenId)
+}
+
+const goToSeason = () => {
+  audioStore.playClick()
+  router.push('/season')
+}
+
+const viewSeasonSpecimen = (specimen) => {
+  if (!isSeasonSpecimenCollected(specimen.id)) {
+    audioStore.playError()
+    return
+  }
+  audioStore.playClick()
+  router.push('/season')
 }
 </script>
 
@@ -417,6 +463,107 @@ const listMineral = (mineral) => {
 .legend-count {
   color: var(--text-secondary);
   font-size: 11px;
+}
+
+.season-specimens-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(139, 92, 246, 0.04));
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 14px;
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: #c084fc;
+  margin: 0;
+}
+
+.season-go-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.3);
+}
+
+.season-specimens-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.season-specimen-card {
+  position: relative;
+  flex-shrink: 0;
+  width: 100px;
+  padding: 14px 10px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.season-specimen-card:hover {
+  transform: translateY(-2px);
+}
+
+.season-specimen-card.collected {
+  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.1);
+}
+
+.season-specimen-card.rarity-legendary {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.season-specimen-card.rarity-legendary.collected {
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.15);
+}
+
+.specimen-exclusive-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+}
+
+.specimen-emoji-small {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.specimen-name-small {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.specimen-status {
+  font-size: 14px;
+}
+
+.specimen-status.collected-status {
+  color: #22c55e;
+  font-weight: 700;
 }
 
 .minerals-container {

@@ -45,8 +45,35 @@
         <span class="nav-icon">{{ item.icon }}</span>
         <span class="nav-label">{{ item.label }}</span>
         <span v-if="item.path === '/task' && taskClaimableCount > 0" class="nav-badge">{{ taskClaimableCount }}</span>
+        <span v-if="item.path === '/season' && seasonClaimableCount > 0" class="nav-badge season-badge">{{ seasonClaimableCount }}</span>
       </RouterLink>
     </nav>
+
+    <SeasonSettlementModal
+      :show="seasonStore.showSettlementModal"
+      :result="seasonStore.settlementResult"
+      @close="seasonStore.closeSettlementModal"
+    />
+
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="seasonStore.showSeasonStartModal && seasonStore.currentSeason" class="season-start-overlay" @click.self="seasonStore.closeSeasonStartModal()">
+          <div class="season-start-popup" :style="{ background: seasonStore.currentSeason.themeGradient }">
+            <div class="start-sparkles">
+              <span v-for="i in 10" :key="i" class="start-sparkle" :style="getStartSparkleStyle(i)">✨</span>
+            </div>
+            <span class="start-emoji">{{ seasonStore.currentSeason.emoji }}</span>
+            <h2 class="start-title">{{ seasonStore.currentSeason.name }}</h2>
+            <p class="start-subtitle">{{ seasonStore.currentSeason.subtitle }}</p>
+            <p class="start-hint">全新赛季已开启！完成通行证任务，赢取限定标本</p>
+            <div class="start-actions">
+              <button class="start-btn secondary" @click="seasonStore.closeSeasonStartModal()">稍后再看</button>
+              <button class="start-btn primary" @click="goToSeason">进入赛季</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div v-if="marketStore.showListModal || marketStore.showBidModal">
       <RouterView name="marketModals" />
@@ -64,6 +91,8 @@ import { useGachaStore } from './stores/gacha'
 import { useMuseumStore } from './stores/museum'
 import { useQuizStore } from './stores/quiz'
 import { useExchangeStore } from './stores/exchange'
+import { useSeasonStore } from './stores/season'
+import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -75,9 +104,11 @@ const gachaStore = useGachaStore()
 const museumStore = useMuseumStore()
 const quizStore = useQuizStore()
 const exchangeStore = useExchangeStore()
+const seasonStore = useSeasonStore()
 
 const navItems = [
   { path: '/', icon: '🏛️', label: '博物馆' },
+  { path: '/season', icon: '🏆', label: '赛季' },
   { path: '/showcase', icon: '📦', label: '展柜' },
   { path: '/expedition', icon: '🗺️', label: '远征' },
   { path: '/collage', icon: '🎨', label: '拼装' },
@@ -93,6 +124,7 @@ const collectedCount = computed(() => gameStore.collectedMinerals.length)
 const totalCount = computed(() => gameStore.allMinerals.length)
 const soundEnabled = computed(() => audioStore.soundEnabled)
 const taskClaimableCount = computed(() => taskStore.claimableCount)
+const seasonClaimableCount = computed(() => seasonStore.totalClaimableCount)
 
 const toggleSound = () => {
   audioStore.toggleSound()
@@ -100,6 +132,20 @@ const toggleSound = () => {
 
 const goToTasks = () => {
   router.push('/task')
+}
+
+const goToSeason = () => {
+  seasonStore.closeSeasonStartModal()
+  router.push('/season')
+}
+
+const getStartSparkleStyle = (index) => {
+  const angle = (index / 10) * 360
+  const delay = index * 0.12
+  return {
+    '--angle': `${angle}deg`,
+    '--delay': `${delay}s`
+  }
 }
 
 const marketUpdateTimer = ref(null)
@@ -113,26 +159,31 @@ onMounted(() => {
   museumStore.loadData()
   quizStore.loadProgress()
   exchangeStore.loadExchangeData()
+  seasonStore.loadSeasonData()
 
   gameStore.onTaskEvent = (eventName, payload) => {
     switch (eventName) {
       case 'expeditionComplete':
         taskStore.onExpeditionComplete(payload)
+        seasonStore.onExpeditionComplete()
         break
       case 'staminaSpent':
         taskStore.onStaminaSpent(payload)
         break
       case 'mineralCollected':
         taskStore.onMineralCollected(payload)
+        seasonStore.onMineralCollected(payload)
         break
       case 'collageComplete':
         taskStore.onCollageComplete()
+        seasonStore.onCollageComplete()
         break
       case 'coinsEarned':
         taskStore.onCoinsEarned(payload)
         break
       case 'marketTransaction':
         taskStore.onMarketTransaction(payload)
+        seasonStore.onMarketTransaction()
         break
       case 'marketBid':
         taskStore.onMarketBid()
@@ -144,6 +195,7 @@ onMounted(() => {
     marketStore.checkAllAuctions()
     marketStore.simulateNPCBids()
     taskStore.checkResets()
+    seasonStore.checkSeasonTransition()
   }, 5000)
 })
 
@@ -328,6 +380,143 @@ onUnmounted(() => {
   border-radius: 8px;
   padding: 0 4px;
   line-height: 1;
+}
+
+.nav-badge.season-badge {
+  background: #a855f7;
+}
+
+.season-start-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.season-start-popup {
+  position: relative;
+  border-radius: 24px;
+  padding: 40px 32px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  animation: startPopIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes startPopIn {
+  from { opacity: 0; transform: scale(0.5) translateY(40px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.start-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.start-sparkle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 18px;
+  animation: startSparkle 2s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes startSparkle {
+  0%, 100% {
+    transform: translate(-50%, -50%) rotate(0deg) scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(
+      calc(-50% + cos(var(--angle)) * 120px),
+      calc(-50% + sin(var(--angle)) * 120px)
+    ) rotate(180deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.start-emoji {
+  position: relative;
+  font-size: 72px;
+  display: block;
+  margin-bottom: 16px;
+  animation: float 2s ease-in-out infinite;
+}
+
+.start-title {
+  position: relative;
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 8px 0;
+}
+
+.start-subtitle {
+  position: relative;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 0 16px 0;
+}
+
+.start-hint {
+  position: relative;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.start-actions {
+  position: relative;
+  display: flex;
+  gap: 12px;
+}
+
+.start-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.start-btn.secondary {
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.start-btn.primary {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1e1b4b;
+}
+
+.start-btn:hover {
+  transform: translateY(-2px);
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 
 @keyframes float {

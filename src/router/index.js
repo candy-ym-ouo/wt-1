@@ -42,6 +42,11 @@ const routes = [
     component: () => import('@/views/TaskCenterView.vue')
   },
   {
+    path: '/season',
+    name: 'Season',
+    component: () => import('@/views/SeasonView.vue')
+  },
+  {
     path: '/quiz',
     name: 'Quiz',
     component: () => import('@/views/QuizView.vue')

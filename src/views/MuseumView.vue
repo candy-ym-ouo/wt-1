@@ -26,6 +26,25 @@
       </div>
     </div>
 
+    <div v-if="activeSeason" class="season-banner" @click="goToSeason" :style="{ background: activeSeason.themeGradient }">
+      <div class="banner-shapes">
+        <span v-for="i in 4" :key="i" class="banner-shape" :style="getBannerShapeStyle(i)"></span>
+      </div>
+      <div class="banner-content">
+        <div class="banner-left">
+          <span class="banner-emoji">{{ activeSeason.emoji }}</span>
+          <div class="banner-info">
+            <span class="banner-name">{{ activeSeason.name }}</span>
+            <span class="banner-subtitle">{{ activeSeason.subtitle }}</span>
+          </div>
+        </div>
+        <div class="banner-right">
+          <span class="banner-points" v-if="seasonStore.seasonPoints > 0">⭐ {{ seasonStore.seasonPoints }}</span>
+          <span class="banner-cta">进入赛季 →</span>
+        </div>
+      </div>
+    </div>
+
     <div class="tabs-section">
       <div class="tabs-nav">
         <button 
@@ -175,6 +194,7 @@ import { useRouter } from 'vue-router'
 import { useMuseumStore } from '@/stores/museum'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
+import { useSeasonStore } from '@/stores/season'
 import HallCard from '@/components/HallCard.vue'
 import ExhibitionCard from '@/components/ExhibitionCard.vue'
 import MuseumStats from '@/components/MuseumStats.vue'
@@ -184,6 +204,7 @@ const router = useRouter()
 const museumStore = useMuseumStore()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
+const seasonStore = useSeasonStore()
 
 const tabs = [
   { id: 'halls', icon: '🏛️', label: '展厅' },
@@ -233,6 +254,22 @@ const openHall = (hall) => {
 const openExhibition = (exhibition) => {
   audioStore.playClick()
   selectedExhibition.value = exhibition
+}
+
+const activeSeason = computed(() => seasonStore.activeSeason)
+
+const goToSeason = () => {
+  audioStore.playClick()
+  router.push('/season')
+}
+
+const getBannerShapeStyle = (index) => {
+  const angle = (index / 4) * 360
+  const delay = index * 0.4
+  return {
+    '--angle': `${angle}deg`,
+    '--delay': `${delay}s`
+  }
 }
 
 const viewMineral = (mineral) => {
@@ -386,6 +423,102 @@ const viewMineral = (mineral) => {
 
 .tab-content {
   padding: 20px 16px;
+}
+
+.season-banner {
+  position: relative;
+  margin: 0 16px;
+  margin-top: -12px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 2;
+}
+
+.season-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.banner-shapes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.banner-shape {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  animation: bannerFloat 8s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes bannerFloat {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg) translateX(80px); }
+  50% { transform: translate(-50%, -50%) rotate(180deg) translateX(100px); }
+}
+
+.banner-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+}
+
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.banner-emoji {
+  font-size: 32px;
+}
+
+.banner-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.banner-subtitle {
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.banner-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.banner-points {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fbbf24;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+.banner-cta {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 14px;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
 }
 
 .section-header {

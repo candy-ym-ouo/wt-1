@@ -109,6 +109,7 @@ import { useExchangeStore } from './stores/exchange'
 import { useSeasonStore } from './stores/season'
 import { useDetectorStore } from './stores/detector'
 import { useResearchStore } from './stores/research'
+import { useAuctionStore } from './stores/auction'
 import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
 import { useRouter } from 'vue-router'
 import { MINERALS } from './data/minerals'
@@ -126,6 +127,7 @@ const exchangeStore = useExchangeStore()
 const seasonStore = useSeasonStore()
 const detectorStore = useDetectorStore()
 const researchStore = useResearchStore()
+const auctionStore = useAuctionStore()
 
 const navItems = [
   { path: '/', icon: '🏛️', label: '博物馆' },
@@ -136,6 +138,7 @@ const navItems = [
   { path: '/quiz', icon: '❓', label: '问答' },
   { path: '/collection', icon: '📖', label: '图鉴' },
   { path: '/gacha', icon: '🎁', label: '盲盒' },
+  { path: '/auction', icon: '🎪', label: '拍卖会' },
   { path: '/market', icon: '🏪', label: '市场' },
   { path: '/exchange', icon: '🔄', label: '交换' },
   { path: '/research', icon: '🔬', label: '研究院' },
@@ -195,6 +198,7 @@ onMounted(() => {
   seasonStore.loadSeasonData()
   detectorStore.loadProgress()
   researchStore.loadProgress()
+  auctionStore.loadAuctionData()
 
   gameStore.onTaskEvent = (eventName, payload) => {
     switch (eventName) {

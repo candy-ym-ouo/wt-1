@@ -89,7 +89,8 @@ export const useGameStore = defineStore('game', () => {
     gacha: { name: '盲盒抽取', icon: '🎁', color: '#a855f7' },
     season: { name: '赛季奖励', icon: '🏆', color: '#ef4444' },
     quiz: { name: '问答解锁', icon: '❓', color: '#22c55e' },
-    research: { name: '研究院', icon: '🔬', color: '#6366f1' }
+    research: { name: '研究院', icon: '🔬', color: '#6366f1' },
+    auction: { name: '拍卖竞得', icon: '🎪', color: '#ef4444' }
   }
 
   const getSourceConfig = (source) => {

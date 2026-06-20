@@ -36,8 +36,9 @@
           </div>
           <button 
             class="sound-btn" 
-            @click="toggleSound"
+            @click="openAudioSettings"
             :class="{ active: soundEnabled }"
+            :title="soundEnabled ? '音效设置' : '音效已关闭'"
           >
             {{ soundEnabled ? '🔊' : '🔇' }}
           </button>
@@ -87,6 +88,191 @@
       :visible="showCoinFlow" 
       @close="closeCoinFlow" 
     />
+
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showAudioSettings" class="audio-settings-overlay" @click.self="closeAudioSettings">
+          <div class="audio-settings-modal">
+            <div class="as-header">
+              <div class="as-title-row">
+                <span class="as-title-icon">🎵</span>
+                <div class="as-title-info">
+                  <h2 class="as-title">音效设置</h2>
+                  <p class="as-subtitle">自定义你的听觉体验</p>
+                </div>
+              </div>
+              <button class="as-close-btn" @click="closeAudioSettings">✕</button>
+            </div>
+
+            <div class="as-content">
+              <div class="as-section master-section">
+                <h3 class="as-section-title">🎛️ 总控开关</h3>
+                <div class="as-master-toggles">
+                  <div class="as-toggle-card" :class="{ active: audioStore.soundEnabled }">
+                    <div class="as-toggle-info">
+                      <span class="as-toggle-icon">{{ audioStore.soundEnabled ? '🔊' : '🔇' }}</span>
+                      <div class="as-toggle-text">
+                        <span class="as-toggle-name">音效总开关</span>
+                        <span class="as-toggle-desc">{{ audioStore.soundEnabled ? '所有音效已开启' : '所有音效已关闭' }}</span>
+                      </div>
+                    </div>
+                    <div class="as-switch" :class="{ on: audioStore.soundEnabled }" @click="audioStore.toggleSound()">
+                      <div class="as-switch-thumb"></div>
+                    </div>
+                  </div>
+
+                  <div class="as-toggle-card" :class="{ active: audioStore.musicEnabled }">
+                    <div class="as-toggle-info">
+                      <span class="as-toggle-icon">{{ audioStore.musicEnabled ? '🎵' : '🚫' }}</span>
+                      <div class="as-toggle-text">
+                        <span class="as-toggle-name">背景音乐</span>
+                        <span class="as-toggle-desc">{{ audioStore.musicEnabled ? '轻柔的背景旋律' : '安静模式' }}</span>
+                      </div>
+                    </div>
+                    <div class="as-switch" :class="{ on: audioStore.musicEnabled }" @click="handleToggleMusic">
+                      <div class="as-switch-thumb"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="as-section volume-section">
+                <h3 class="as-section-title">🔊 音量调节</h3>
+                <div class="as-volume-cards">
+                  <div class="as-volume-card">
+                    <div class="as-volume-header">
+                      <span class="as-volume-icon">🎼</span>
+                      <span class="as-volume-name">背景音乐</span>
+                      <span class="as-volume-value">{{ Math.round(audioStore.musicVolume * 100) }}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      class="as-range"
+                      min="0"
+                      max="100"
+                      :value="Math.round(audioStore.musicVolume * 100)"
+                      @input="audioStore.setMusicVolume($event.target.value / 100)"
+                    />
+                    <div class="as-range-labels">
+                      <span>静音</span>
+                      <span>最大</span>
+                    </div>
+                  </div>
+
+                  <div class="as-volume-card">
+                    <div class="as-volume-header">
+                      <span class="as-volume-icon">🔔</span>
+                      <span class="as-volume-name">总音效</span>
+                      <span class="as-volume-value">{{ Math.round(audioStore.sfxVolume * 100) }}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      class="as-range"
+                      min="0"
+                      max="100"
+                      :value="Math.round(audioStore.sfxVolume * 100)"
+                      @input="audioStore.setSfxVolume($event.target.value / 100)"
+                    />
+                    <div class="as-range-labels">
+                      <span>静音</span>
+                      <span>最大</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="as-section discovery-section">
+                <h3 class="as-section-title">✨ 特殊音效</h3>
+                <div class="as-discovery-card" :class="{ active: audioStore.rareDiscoveryEnabled }">
+                  <div class="as-discovery-info">
+                    <div class="as-discovery-icon-wrap">
+                      <span class="as-discovery-icon">💎</span>
+                      <span class="as-discovery-sparkle" v-if="audioStore.rareDiscoveryEnabled">✨</span>
+                    </div>
+                    <div class="as-discovery-text">
+                      <span class="as-discovery-name">稀有发现音效</span>
+                      <span class="as-discovery-desc">
+                        {{ audioStore.rareDiscoveryEnabled 
+                          ? '发现稀有矿物时播放庆祝音效与特效音' 
+                          : '关闭后稀有发现将静默' 
+                        }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="as-switch" :class="{ on: audioStore.rareDiscoveryEnabled }" @click="audioStore.toggleRareDiscovery()">
+                    <div class="as-switch-thumb"></div>
+                  </div>
+                </div>
+                <button 
+                  :class="['as-preview-btn', previewDiscoveryClass]"
+                  @click="playRarePreview"
+                  :disabled="!audioStore.rareDiscoveryEnabled"
+                >
+                  <span class="as-preview-icon">▶</span>
+                  <span>试听稀有音效</span>
+                </button>
+              </div>
+
+              <div class="as-section scenes-section">
+                <div class="as-section-header">
+                  <h3 class="as-section-title">🎯 场景分类音量</h3>
+                  <button class="as-reset-btn" @click="audioStore.resetSceneVolumes">
+                    ↺ 全部重置
+                  </button>
+                </div>
+
+                <div class="as-scenes-grid">
+                  <div 
+                    v-for="scene in sceneCategoryList" 
+                    :key="scene.id"
+                    :class="getSceneCardClass(scene)"
+                  >
+                    <div class="as-scene-header">
+                      <span class="as-scene-icon">{{ scene.icon }}</span>
+                      <div class="as-scene-info">
+                        <span class="as-scene-name">{{ scene.name }}</span>
+                        <span class="as-scene-desc">{{ scene.description }}</span>
+                      </div>
+                      <span class="as-scene-volume">
+                        {{ Math.round(audioStore.sceneVolumes[scene.id] * 100) }}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      class="as-range as-scene-range"
+                      min="0"
+                      max="100"
+                      :value="Math.round(audioStore.sceneVolumes[scene.id] * 100)"
+                      @input="audioStore.setSceneVolume(scene.id, $event.target.value / 100)"
+                    />
+                    <div class="as-scene-samples" v-if="audioStore.getSamplesByCategory(scene.id).length > 0">
+                      <button
+                        v-for="sample in audioStore.getSamplesByCategory(scene.id)"
+                        :key="sample.key"
+                        :class="getSampleBtnClass(scene.id)"
+                        @click="playSample(sample.key)"
+                      >
+                        <span class="as-sample-name">{{ sample.name }}</span>
+                        <span class="as-sample-play">▶</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="as-footer">
+              <button class="as-footer-hint">
+                💡 提示：所有设置自动保存到本地
+              </button>
+              <button class="btn as-close-action" @click="closeAudioSettings">
+                完成设置
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <Teleport to="body">
       <Transition name="modal">
@@ -150,6 +336,7 @@ const researchStore = useResearchStore()
 const auctionStore = useAuctionStore()
 
 const showCoinFlow = ref(false)
+const showAudioSettings = ref(false)
 
 const openCoinFlow = () => {
   audioStore.playClick()
@@ -158,6 +345,51 @@ const openCoinFlow = () => {
 
 const closeCoinFlow = () => {
   showCoinFlow.value = false
+}
+
+const openAudioSettings = () => {
+  audioStore.playClick()
+  showAudioSettings.value = true
+}
+
+const closeAudioSettings = () => {
+  audioStore.playClick()
+  showAudioSettings.value = false
+}
+
+const handleToggleMusic = () => {
+  audioStore.toggleMusic()
+}
+
+const sceneCategoryList = computed(() => {
+  return Object.values(audioStore.SCENE_CATEGORIES)
+})
+
+const previewDiscoveryClass = computed(() => {
+  return audioStore.currentPreviewScene === 'discovery' ? 'playing' : ''
+})
+
+const playRarePreview = () => {
+  audioStore.playPreview('rareFound')
+}
+
+const isPreviewingScene = (sceneId) => {
+  return audioStore.currentPreviewScene === sceneId
+}
+
+const getSceneCardClass = (scene) => {
+  const classes = ['as-scene-card']
+  if (audioStore.sceneVolumes[scene.id] === 0) classes.push('muted')
+  if (audioStore.currentPreviewScene === scene.id) classes.push('previewing')
+  return classes
+}
+
+const getSampleBtnClass = (sceneId) => {
+  return audioStore.currentPreviewScene === sceneId ? ['as-sample-btn', 'playing'] : ['as-sample-btn']
+}
+
+const playSample = (sfxKey) => {
+  audioStore.playPreview(sfxKey)
 }
 
 const navItems = [
@@ -734,6 +966,641 @@ onUnmounted(() => {
 
   .nav-label {
     font-size: 9px;
+  }
+}
+
+.audio-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.audio-settings-modal {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
+  animation: asSlideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes asSlideIn {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.as-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.1), rgba(168, 85, 247, 0.05));
+}
+
+.as-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.as-title-icon {
+  font-size: 40px;
+  animation: asTitleFloat 3s ease-in-out infinite;
+}
+
+@keyframes asTitleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.as-title-info .as-title {
+  margin: 0 0 2px 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  background: linear-gradient(135deg, #e94560, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.as-title-info .as-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.as-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.as-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.as-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.as-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.as-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.as-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.as-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.as-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.as-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.as-master-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.as-toggle-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.25s;
+}
+
+.as-toggle-card.active {
+  border-color: rgba(233, 69, 96, 0.3);
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.as-toggle-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.as-toggle-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.as-toggle-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.as-toggle-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.as-toggle-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.as-switch {
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.15);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s;
+  flex-shrink: 0;
+}
+
+.as-switch.on {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  box-shadow: 0 0 12px rgba(233, 69, 96, 0.4);
+}
+
+.as-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.as-switch.on .as-switch-thumb {
+  left: 21px;
+}
+
+.as-volume-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.as-volume-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.as-volume-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.as-volume-icon {
+  font-size: 20px;
+}
+
+.as-volume-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.as-volume-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  color: #e94560;
+  min-width: 45px;
+  text-align: right;
+}
+
+.as-range {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+}
+
+.as-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(233, 69, 96, 0.5);
+  border: 2px solid white;
+  transition: transform 0.15s;
+}
+
+.as-range::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.as-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(233, 69, 96, 0.5);
+  border: 2px solid white;
+}
+
+.as-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.as-discovery-card {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.05));
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.25s;
+}
+
+.as-discovery-card.active {
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
+}
+
+.as-discovery-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.as-discovery-icon-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.as-discovery-icon {
+  font-size: 24px;
+}
+
+.as-discovery-sparkle {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 14px;
+  animation: sparkleSpin 2s linear infinite;
+}
+
+@keyframes sparkleSpin {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.2); }
+}
+
+.as-discovery-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.as-discovery-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.as-discovery-desc {
+  font-size: 12px;
+  color: rgba(251, 191, 36, 0.7);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.as-preview-btn {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px dashed rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.as-preview-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.as-preview-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.as-preview-btn.playing {
+  background: rgba(245, 158, 11, 0.25);
+  animation: asPulse 1s ease-in-out infinite;
+}
+
+@keyframes asPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.2); }
+}
+
+.as-preview-icon {
+  font-size: 14px;
+}
+
+.as-reset-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.as-reset-btn:hover {
+  background: rgba(233, 69, 96, 0.15);
+  border-color: rgba(233, 69, 96, 0.3);
+  color: #e94560;
+}
+
+.as-scenes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.as-scene-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.25s;
+}
+
+.as-scene-card.muted {
+  opacity: 0.55;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.as-scene-card.previewing {
+  border-color: rgba(233, 69, 96, 0.5);
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.1), var(--bg-card));
+  box-shadow: 0 4px 16px rgba(233, 69, 96, 0.15);
+}
+
+.as-scene-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.as-scene-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.as-scene-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.as-scene-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.as-scene-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.as-scene-volume {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  color: #e94560;
+  min-width: 45px;
+  text-align: right;
+}
+
+.as-scene-range {
+  height: 5px;
+}
+
+.as-scene-range::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+}
+
+.as-scene-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.06);
+  margin-top: 2px;
+}
+
+.as-sample-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.as-sample-btn:hover {
+  background: rgba(233, 69, 96, 0.12);
+  border-color: rgba(233, 69, 96, 0.3);
+  color: #e94560;
+}
+
+.as-sample-btn.playing {
+  background: rgba(233, 69, 96, 0.2);
+  border-color: rgba(233, 69, 96, 0.5);
+  color: #e94560;
+}
+
+.as-sample-name {
+  white-space: nowrap;
+}
+
+.as-sample-play {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.as-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.as-footer-hint {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+  padding: 0;
+  cursor: default;
+}
+
+.as-close-action {
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(233, 69, 96, 0.4);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.as-close-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.5);
+}
+
+@media (max-width: 560px) {
+  .audio-settings-modal {
+    max-height: 92vh;
+    border-radius: 20px;
+  }
+
+  .as-header,
+  .as-content,
+  .as-footer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .as-master-toggles {
+    grid-template-columns: 1fr;
+  }
+
+  .as-title {
+    font-size: 19px;
+  }
+
+  .as-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .as-footer-hint {
+    text-align: center;
   }
 }
 </style>

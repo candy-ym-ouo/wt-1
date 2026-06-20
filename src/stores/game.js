@@ -162,6 +162,169 @@ export const useGameStore = defineStore('game', () => {
     }
   })
 
+  const rarityProgress = computed(() => {
+    const allMinerals = MINERALS
+    const collectedIds = new Set(collectedMinerals.value.map(m => m.id))
+    const result = {}
+
+    for (const [rarity, config] of Object.entries(RARITY_CONFIG)) {
+      const total = allMinerals.filter(m => m.rarity === rarity).length
+      const collected = allMinerals.filter(m => m.rarity === rarity && collectedIds.has(m.id)).length
+      result[rarity] = {
+        name: config.name,
+        color: config.color,
+        bgGradient: config.bgGradient,
+        collected,
+        total,
+        percentage: total > 0 ? Math.round((collected / total) * 100) : 0
+      }
+    }
+    return result
+  })
+
+  const collectionMilestones = computed(() => {
+    const total = MINERALS.length
+    const collected = collectedMinerals.value.length
+    return [
+      { threshold: 1, label: '初入矿物世界', icon: '🌱', description: '收集第1种矿物' },
+      { threshold: 3, label: '新手收藏家', icon: '📦', description: '收集3种矿物' },
+      { threshold: Math.ceil(total * 0.25), label: '矿物爱好者', icon: '💎', description: `收集${Math.ceil(total * 0.25)}种矿物（25%）` },
+      { threshold: Math.ceil(total * 0.5), label: '资深收藏家', icon: '🏆', description: `收集${Math.ceil(total * 0.5)}种矿物（50%）` },
+      { threshold: Math.ceil(total * 0.75), label: '矿物学专家', icon: '🎓', description: `收集${Math.ceil(total * 0.75)}种矿物（75%）` },
+      { threshold: Math.ceil(total * 0.9), label: '传奇收藏家', icon: '👑', description: `收集${Math.ceil(total * 0.9)}种矿物（90%）` },
+      { threshold: total, label: '矿物博物馆馆长', icon: '🏛️', description: `收集全部${total}种矿物` }
+    ]
+  })
+
+  const rarityMilestones = computed(() => {
+    const milestones = {}
+    for (const [rarity, config] of Object.entries(RARITY_CONFIG)) {
+      const total = MINERALS.filter(m => m.rarity === rarity).length
+      if (total === 0) continue
+
+      const rarityMiles = []
+      for (let i = 1; i <= total; i++) {
+        let label = ''
+        let icon = '✨'
+        if (i === 1) {
+          label = `首个${config.name}`
+          icon = '🌟'
+        } else if (i === total) {
+          label = `集齐${config.name}`
+          icon = '🏆'
+        } else {
+          label = `${config.name}×${i}`
+          icon = '💎'
+        }
+        rarityMiles.push({
+          threshold: i,
+          label,
+          icon,
+          description: `收集${i}种${config.name}矿物`,
+          rarity,
+          config
+        })
+      }
+      milestones[rarity] = rarityMiles
+    }
+    return milestones
+  })
+
+  const currentMilestone = computed(() => {
+    const collected = collectedMinerals.value.length
+    const milestones = collectionMilestones.value
+    const completed = milestones.filter(m => collected >= m.threshold)
+    const next = milestones.find(m => collected < m.threshold)
+    
+    return {
+      completedCount: completed.length,
+      totalCount: milestones.length,
+      current: completed.length > 0 ? completed[completed.length - 1] : null,
+      next: next || null,
+      progressToNext: next ? {
+        needed: next.threshold - collected,
+        percentage: Math.min(100, Math.round((collected / next.threshold) * 100))
+      } : null
+    }
+  })
+
+  const currentRarityMilestones = computed(() => {
+    const collectedIds = new Set(collectedMinerals.value.map(m => m.id))
+    const result = {}
+    
+    for (const [rarity, milestones] of Object.entries(rarityMilestones.value)) {
+      const total = MINERALS.filter(m => m.rarity === rarity).length
+      const collected = MINERALS.filter(m => m.rarity === rarity && collectedIds.has(m.id)).length
+      const completed = milestones.filter(m => collected >= m.threshold)
+      const next = milestones.find(m => collected < m.threshold)
+      
+      result[rarity] = {
+        collected,
+        total,
+        completedCount: completed.length,
+        totalCount: milestones.length,
+        current: completed.length > 0 ? completed[completed.length - 1] : null,
+        next: next || null,
+        progressToNext: next ? {
+          needed: next.threshold - collected,
+          percentage: Math.min(100, Math.round((collected / next.threshold) * 100))
+        } : null
+      }
+    }
+    return result
+  })
+
+  const collectionStageGoals = computed(() => {
+    const collected = collectedMinerals.value.length
+    const total = MINERALS.length
+    const percentage = total > 0 ? (collected / total) * 100 : 0
+
+    let currentStage = null
+    let nextStage = null
+
+    if (percentage === 0) {
+      currentStage = { stage: 0, label: '待启程', description: '开始你的矿物收集之旅吧！', icon: '🚀' }
+      nextStage = { stage: 1, label: '初入矿物世界', goal: 1, description: '收集第1种矿物' }
+    } else if (percentage < 25) {
+      currentStage = { stage: 1, label: '探索者', description: '正在熟悉矿物世界', icon: '🔍' }
+      nextStage = { stage: 2, label: '矿物爱好者', goal: Math.ceil(total * 0.25), description: '达成25%收集进度' }
+    } else if (percentage < 50) {
+      currentStage = { stage: 2, label: '爱好者', description: '对矿物有了初步了解', icon: '💎' }
+      nextStage = { stage: 3, label: '资深收藏家', goal: Math.ceil(total * 0.5), description: '达成50%收集进度' }
+    } else if (percentage < 75) {
+      currentStage = { stage: 3, label: '收藏家', description: '已经是资深玩家了', icon: '🏆' }
+      nextStage = { stage: 4, label: '矿物学专家', goal: Math.ceil(total * 0.75), description: '达成75%收集进度' }
+    } else if (percentage < 100) {
+      currentStage = { stage: 4, label: '专家', description: '接近完成全收集', icon: '🎓' }
+      nextStage = { stage: 5, label: '博物馆馆长', goal: total, description: '完成全部收集' }
+    } else {
+      currentStage = { stage: 5, label: '馆长', description: '已完成全部矿物收集！', icon: '👑' }
+      nextStage = null
+    }
+
+    const nextGoalNeeded = nextStage ? nextStage.goal - collected : 0
+
+    return {
+      current: currentStage,
+      next: nextStage,
+      nextGoalNeeded,
+      currentPercentage: percentage,
+      nextGoalPercentage: nextStage ? Math.min(100, Math.round((collected / nextStage.goal) * 100)) : 100
+    }
+  })
+
+  const nextUncollectedByRarity = computed(() => {
+    const collectedIds = new Set(collectedMinerals.value.map(m => m.id))
+    const result = {}
+    
+    for (const rarity of Object.keys(RARITY_CONFIG)) {
+      const uncollected = MINERALS.filter(m => m.rarity === rarity && !collectedIds.has(m.id))
+      result[rarity] = uncollected.length > 0 ? uncollected[0] : null
+    }
+    
+    return result
+  })
+
   const staminaPercentage = computed(() => {
     return Math.round((stamina.value / maxStamina.value) * 100)
   })
@@ -1562,6 +1725,13 @@ export const useGameStore = defineStore('game', () => {
     allMinerals,
     allLocations,
     collectionProgress,
+    rarityProgress,
+    collectionMilestones,
+    rarityMilestones,
+    currentMilestone,
+    currentRarityMilestones,
+    collectionStageGoals,
+    nextUncollectedByRarity,
     staminaPercentage,
     expeditionProgress,
     recentUnlock,

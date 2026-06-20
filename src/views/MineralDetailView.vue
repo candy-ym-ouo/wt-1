@@ -59,6 +59,66 @@
         </div>
       </div>
 
+      <div class="collection-progress-card">
+        <div class="progress-card-header">
+          <span class="progress-card-icon">📊</span>
+          <span class="progress-card-title">收集进度</span>
+        </div>
+        <div class="progress-card-body">
+          <div class="progress-overview">
+            <div class="overview-item">
+              <span class="overview-label">总收集进度</span>
+              <span class="overview-value">{{ totalProgress.percentage }}%</span>
+              <span class="overview-count">{{ totalProgress.collected }}/{{ totalProgress.total }}</span>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">当前阶段</span>
+              <span class="overview-stage">{{ collectionStageGoals.current?.label || '待启程' }}</span>
+            </div>
+          </div>
+          
+          <div class="rarity-progress-info">
+            <div class="rp-info-header">
+              <span class="rp-info-dot" :style="{ background: rarityConfig?.color }"></span>
+              <span class="rp-info-name">{{ rarityConfig?.name }}稀有度进度</span>
+              <span class="rp-info-percent">{{ rarityProgressCurrent.percentage }}%</span>
+            </div>
+            <div class="rp-info-bar">
+              <div class="rp-info-fill" :style="{ width: rarityProgressCurrent.percentage + '%', background: rarityConfig?.bgGradient }"></div>
+            </div>
+            <div class="rp-info-footer">
+              <span class="rp-info-count">已收集 {{ rarityProgressCurrent.collected }}/{{ rarityProgressCurrent.total }} 种</span>
+              <span class="rp-info-next" v-if="currentRarityMilestone?.next">
+                还差 {{ currentRarityMilestone.progressToNext.needed }} 种达成「{{ currentRarityMilestone.next.label }}」
+              </span>
+              <span class="rp-info-complete" v-else-if="rarityProgressCurrent.collected === rarityProgressCurrent.total && rarityProgressCurrent.total > 0">
+                ✓ 已集齐此稀有度！
+              </span>
+            </div>
+          </div>
+
+          <div class="next-goal-section" v-if="collectionStageGoals.next">
+            <div class="next-goal-header">
+              <span class="next-goal-icon">{{ collectionStageGoals.next.icon }}</span>
+              <div class="next-goal-info">
+                <span class="next-goal-label">下一里程碑</span>
+                <span class="next-goal-name">{{ collectionStageGoals.next.label }}</span>
+              </div>
+              <span class="next-goal-remain">还差 {{ collectionStageGoals.nextGoalNeeded }} 种</span>
+            </div>
+            <div class="next-goal-bar">
+              <div class="next-goal-fill" :style="{ width: collectionStageGoals.nextGoalPercentage + '%' }"></div>
+            </div>
+            <div class="next-goal-text">{{ collectionStageGoals.nextGoalPercentage }}% 进度</div>
+          </div>
+
+          <div class="all-complete-section" v-else>
+            <span class="all-complete-icon">🏆</span>
+            <span class="all-complete-text">恭喜！你已收集全部 {{ totalProgress.total }} 种矿物！</span>
+          </div>
+        </div>
+      </div>
+
       <div class="quick-stats">
         <div class="stat-item">
           <span class="stat-icon">⚗️</span>
@@ -546,7 +606,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
@@ -636,6 +696,30 @@ const userRating = computed(() => {
 const isFav = computed(() => {
   if (!mineral.value) return false
   return museumStore.isFavorite(mineral.value.id)
+})
+
+const totalProgress = computed(() => {
+  const collected = gameStore.collectedMinerals.length
+  const total = gameStore.allMinerals.length
+  return {
+    collected,
+    total,
+    percentage: total > 0 ? Math.round((collected / total) * 100) : 0
+  }
+})
+
+const collectionStageGoals = computed(() => gameStore.collectionStageGoals)
+
+const rarityProgressCurrent = computed(() => {
+  if (!mineral.value) return { collected: 0, total: 0, percentage: 0 }
+  const rarity = mineral.value.rarity
+  return gameStore.rarityProgress[rarity] || { collected: 0, total: 0, percentage: 0 }
+})
+
+const currentRarityMilestone = computed(() => {
+  if (!mineral.value) return null
+  const rarity = mineral.value.rarity
+  return gameStore.currentRarityMilestones[rarity] || null
 })
 
 const relatedHalls = computed(() => {
@@ -2338,6 +2422,309 @@ onMounted(() => {
   
   .summary-value {
     font-size: 14px;
+  }
+}
+
+.collection-progress-card {
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.1), rgba(168, 85, 247, 0.06));
+  border: 1px solid rgba(233, 69, 96, 0.2);
+  border-radius: 16px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.progress-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.progress-card-icon {
+  font-size: 18px;
+}
+
+.progress-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.progress-card-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.progress-overview {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.overview-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.overview-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.overview-value {
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #e94560, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.overview-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+.overview-stage {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-align: center;
+}
+
+.rarity-progress-info {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rp-info-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.rp-info-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rp-info-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rp-info-percent {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+}
+
+.rp-info-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.rp-info-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.rp-info-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  background-size: 30px 100%;
+  animation: shimmer3 2s infinite;
+}
+
+@keyframes shimmer3 {
+  0% { background-position: -30px 0; }
+  100% { background-position: calc(100% + 30px) 0; }
+}
+
+.rp-info-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rp-info-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rp-info-next {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.rp-info-complete {
+  font-size: 12px;
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.next-goal-section {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.next-goal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.next-goal-icon {
+  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(251, 191, 36, 0.15);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.next-goal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.next-goal-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.next-goal-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.next-goal-remain {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+.next-goal-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.next-goal-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b, #e94560);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.next-goal-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  background-size: 30px 100%;
+  animation: shimmer4 2s infinite;
+}
+
+@keyframes shimmer4 {
+  0% { background-position: -30px 0; }
+  100% { background-position: calc(100% + 30px) 0; }
+}
+
+.next-goal-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.all-complete-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.08));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+}
+
+.all-complete-icon {
+  font-size: 32px;
+}
+
+.all-complete-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fbbf24;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .progress-overview {
+    grid-template-columns: 1fr;
+  }
+  
+  .next-goal-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .next-goal-remain {
+    align-self: flex-start;
+  }
+  
+  .all-complete-section {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
   }
 }
 </style>

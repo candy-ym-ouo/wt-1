@@ -67,6 +67,114 @@
         </div>
       </div>
 
+      <div class="stage-goal-section">
+        <div class="stage-goal-card">
+          <div class="stage-goal-left">
+            <span class="stage-goal-icon">{{ collectionStageGoals.current?.icon || '🚀' }}</span>
+            <div class="stage-goal-info">
+              <div class="stage-goal-current-label">当前阶段</div>
+              <div class="stage-goal-name">{{ collectionStageGoals.current?.label || '待启程' }}</div>
+              <div class="stage-goal-desc">{{ collectionStageGoals.current?.description || '开始你的矿物收集之旅' }}</div>
+            </div>
+          </div>
+          <div class="stage-goal-right" v-if="collectionStageGoals.next">
+            <div class="next-milestone-info">
+              <div class="milestone-progress-label">
+                <span class="milestone-icon-small">{{ collectionStageGoals.next.icon }}</span>
+                <span class="milestone-name">{{ collectionStageGoals.next.label }}</span>
+                <span class="milestone-remain">还差 {{ collectionStageGoals.nextGoalNeeded }} 种</span>
+              </div>
+              <div class="milestone-progress-bar">
+                <div class="milestone-progress-fill" :style="{ width: collectionStageGoals.nextGoalPercentage + '%' }"></div>
+              </div>
+              <div class="milestone-progress-text">{{ collectionStageGoals.nextGoalPercentage }}% 进度</div>
+            </div>
+          </div>
+          <div class="stage-goal-right" v-else>
+            <div class="full-completion-badge">
+              <span class="completion-trophy">🏆</span>
+              <span class="completion-message">恭喜！已收集全部 {{ progress.total }} 种矿物！</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rarity-collection-section">
+        <div class="section-header">
+          <h3 class="section-title">💎 分稀有度收集进度</h3>
+          <span class="section-hint">点击可筛选该稀有度矿物</span>
+        </div>
+        <div class="rarity-collection-grid">
+          <div 
+            v-for="(progress, rarity) in rarityProgress" 
+            :key="rarity"
+            class="rarity-collection-card"
+            :style="{ '--rarity-color': progress.color, '--rarity-gradient': progress.bgGradient }"
+            :class="{ 'filter-active': activeFilter === rarity }"
+            @click="setRarityFilter(rarity)"
+          >
+            <div class="rc-header">
+              <div class="rc-info">
+                <span class="rc-dot"></span>
+                <span class="rc-name">{{ progress.name }}</span>
+              </div>
+              <div class="rc-stats">
+                <span class="rc-count">{{ progress.collected }}/{{ progress.total }}</span>
+                <span class="rc-percent">{{ progress.percentage }}%</span>
+              </div>
+            </div>
+            <div class="rc-progress-bar">
+              <div class="rc-progress-fill" :style="{ width: progress.percentage + '%' }"></div>
+            </div>
+            <div class="rc-footer">
+              <span class="rc-milestone" v-if="currentRarityMilestones[rarity]?.next">
+                距「{{ currentRarityMilestones[rarity].next.label }}」还差 {{ currentRarityMilestones[rarity].progressToNext.needed }} 种
+              </span>
+              <span class="rc-all-collected" v-else-if="progress.collected === progress.total && progress.total > 0">
+                ✓ 已全部收集
+              </span>
+              <span class="rc-next-mineral" v-else-if="nextUncollectedByRarity[rarity]">
+                下一个：{{ nextUncollectedByRarity[rarity].name }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="collection-milestones-section">
+        <div class="section-header">
+          <h3 class="section-title">🎯 收集里程碑</h3>
+        </div>
+        <div class="milestones-container">
+          <div 
+            v-for="(milestone, index) in collectionMilestones" 
+            :key="milestone.threshold"
+            :class="['milestone-item', { 
+              completed: progress.collected >= milestone.threshold, 
+              current: isCurrentMilestone(index) 
+            }]"
+          >
+            <div class="milestone-connector" v-if="index < collectionMilestones.length - 1"></div>
+            <div class="milestone-circle">
+              <span class="milestone-emoji">{{ milestone.icon }}</span>
+            </div>
+            <div class="milestone-content">
+              <div class="milestone-header">
+                <span class="milestone-title">{{ milestone.label }}</span>
+                <span class="milestone-threshold">{{ milestone.threshold }} 种</span>
+              </div>
+              <div class="milestone-description">{{ milestone.description }}</div>
+              <div class="milestone-progress-info" v-if="!isLastMilestone(index) && progress.collected < milestone.threshold">
+                <span>当前进度: {{ progress.collected }}/{{ milestone.threshold }}</span>
+              </div>
+              <div class="milestone-achieved" v-else-if="progress.collected >= milestone.threshold">
+                ✓ 已达成
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="exchange-balance-bar">
         <div class="balance-item token-balance">
           <span class="balance-icon">{{ exchangeStore.tokenInfo.emoji }}</span>
@@ -1004,7 +1112,29 @@ const progress = computed(() => {
   }
 })
 
+const rarityProgress = computed(() => gameStore.rarityProgress)
+const collectionMilestones = computed(() => gameStore.collectionMilestones)
+const currentRarityMilestones = computed(() => gameStore.currentRarityMilestones)
+const collectionStageGoals = computed(() => gameStore.collectionStageGoals)
+const nextUncollectedByRarity = computed(() => gameStore.nextUncollectedByRarity)
+
 const researchProgress = computed(() => researchStore.cardStats)
+
+const setRarityFilter = (rarity) => {
+  audioStore.playClick()
+  activeFilter.value = rarity
+}
+
+const isCurrentMilestone = (index) => {
+  const collected = progress.value.collected
+  const milestone = collectionMilestones.value[index]
+  const prevMilestone = index > 0 ? collectionMilestones.value[index - 1] : null
+  return collected < milestone.threshold && (!prevMilestone || collected >= prevMilestone.threshold)
+}
+
+const isLastMilestone = (index) => {
+  return index === collectionMilestones.value.length - 1
+}
 
 const getMineralUnlockedCardCount = (mineralId) => {
   return researchStore.getCardsForMineral(mineralId).length
@@ -3270,5 +3400,447 @@ const openBatchExchange = () => {
 
 .expedition-btn:hover {
   background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.stage-goal-section {
+  margin-bottom: 20px;
+}
+
+.stage-goal-card {
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.12), rgba(168, 85, 247, 0.08));
+  border: 1px solid rgba(233, 69, 96, 0.25);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.stage-goal-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.stage-goal-icon {
+  font-size: 44px;
+  width: 68px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+}
+
+.stage-goal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stage-goal-current-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.stage-goal-name {
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #e94560, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stage-goal-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.stage-goal-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.next-milestone-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.milestone-progress-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.milestone-icon-small {
+  font-size: 16px;
+}
+
+.milestone-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.milestone-remain {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.milestone-progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.milestone-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b, #e94560);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.milestone-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  background-size: 40px 100%;
+  animation: shimmer2 2s infinite;
+}
+
+@keyframes shimmer2 {
+  0% { background-position: -40px 0; }
+  100% { background-position: calc(100% + 40px) 0; }
+}
+
+.milestone-progress-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.full-completion-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.1));
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.completion-trophy {
+  font-size: 26px;
+}
+
+.completion-message {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.section-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.rarity-collection-section {
+  margin-bottom: 20px;
+}
+
+.rarity-collection-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 600px) {
+  .rarity-collection-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .rarity-collection-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.rarity-collection-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--rarity-color, #6b7280);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rarity-collection-card:hover {
+  background: rgba(0, 0, 0, 0.35);
+  transform: translateX(2px);
+}
+
+.rarity-collection-card.filter-active {
+  border-color: var(--rarity-color, #6b7280);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 2px var(--rarity-color), 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.rc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.rc-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--rarity-color, #6b7280);
+  flex-shrink: 0;
+}
+
+.rc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rc-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rc-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rarity-color, var(--text-secondary));
+  font-family: 'Courier New', monospace;
+}
+
+.rc-percent {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rarity-color, var(--text-secondary));
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.rc-progress-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.rc-progress-fill {
+  height: 100%;
+  background: var(--rarity-gradient, linear-gradient(90deg, #6b7280, #9ca3af));
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.rc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rc-milestone {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.rc-all-collected {
+  font-size: 11px;
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.rc-next-mineral {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.collection-milestones-section {
+  margin-bottom: 20px;
+}
+
+.milestones-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.milestone-item {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.milestone-item:last-child {
+  margin-bottom: 0;
+}
+
+.milestone-item.completed {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), transparent);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.milestone-item.current {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), transparent);
+  border-color: rgba(251, 191, 36, 0.3);
+  animation: milestonePulse 2s ease-in-out infinite;
+}
+
+@keyframes milestonePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 0); }
+}
+
+.milestone-connector {
+  position: absolute;
+  left: 38px;
+  top: 60px;
+  width: 2px;
+  height: calc(100% - 52px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.milestone-item.completed .milestone-connector {
+  background: linear-gradient(180deg, #22c55e, rgba(34, 197, 94, 0.2));
+}
+
+.milestone-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.milestone-item.completed .milestone-circle {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border-color: #22c55e;
+}
+
+.milestone-item.current .milestone-circle {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-color: #fbbf24;
+}
+
+.milestone-emoji {
+  font-size: 20px;
+}
+
+.milestone-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.milestone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.milestone-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.milestone-threshold {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+.milestone-description {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.milestone-progress-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Courier New', monospace;
+}
+
+.milestone-achieved {
+  font-size: 12px;
+  font-weight: 600;
+  color: #22c55e;
+}
+
+@media (max-width: 600px) {
+  .stage-goal-card {
+    flex-direction: column;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .stage-goal-left {
+    width: 100%;
+  }
+
+  .stage-goal-right {
+    width: 100%;
+  }
 }
 </style>

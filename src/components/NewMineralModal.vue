@@ -34,6 +34,11 @@
             </div>
           </div>
 
+          <div class="duplicate-hint" v-if="!isNew && duplicateCount > 0">
+            <span class="hint-icon">♻️</span>
+            <span class="hint-text">已有多余 {{ duplicateCount }} 份，可批量兑换换取更多金币</span>
+          </div>
+
           <div class="mineral-formula">
             <span class="formula-label">化学式</span>
             <span class="formula-value">{{ mineral?.formula }}</span>
@@ -47,6 +52,14 @@
               查看详情
             </button>
           </div>
+          <button
+            v-if="duplicateCount > 0"
+            class="btn btn-batch-exchange-hint"
+            @click="handleBatchExchange"
+          >
+            <span class="btn-icon">♻️</span>
+            批量兑换多余藏品 ({{ duplicateCount }}份)
+          </button>
         </div>
       </div>
     </Transition>
@@ -57,6 +70,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { RARITY_CONFIG, getRarityStars, RARITY } from '@/data/rarity'
+import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 
 const props = defineProps({
@@ -65,10 +79,11 @@ const props = defineProps({
   isNew: Boolean
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'batchExchange'])
 
 const router = useRouter()
 const audioStore = useAudioStore()
+const gameStore = useGameStore()
 
 const rarityConfig = computed(() => {
   return props.mineral ? RARITY_CONFIG[props.mineral.rarity] : null
@@ -80,6 +95,12 @@ const stars = computed(() => props.mineral ? getRarityStars(props.mineral.rarity
 const isRare = computed(() => {
   return props.mineral && 
     [RARITY.EPIC, RARITY.LEGENDARY].includes(props.mineral.rarity)
+})
+
+const duplicateCount = computed(() => {
+  if (!props.mineral || props.isNew) return 0
+  const collected = gameStore.collectedMinerals.find(m => m.id === props.mineral.id)
+  return collected ? collected.count - 1 : 0
 })
 
 const getSparkleStyle = (index) => {
@@ -100,6 +121,11 @@ const handleViewDetail = () => {
   audioStore.playClick()
   emit('close')
   router.push(`/mineral/${props.mineral.id}`)
+}
+
+const handleBatchExchange = () => {
+  audioStore.playClick()
+  emit('batchExchange')
 }
 </script>
 
@@ -335,6 +361,51 @@ const handleViewDetail = () => {
   flex: 1;
   padding: 14px 20px;
   font-size: 16px;
+}
+
+.duplicate-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: rgba(245, 158, 11, 0.12);
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.duplicate-hint .hint-icon {
+  font-size: 18px;
+}
+
+.duplicate-hint .hint-text {
+  font-size: 13px;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.btn-batch-exchange-hint {
+  margin-top: 12px;
+  width: 100%;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  color: #000;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-batch-exchange-hint:hover {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
 }
 
 @keyframes modalEnter {

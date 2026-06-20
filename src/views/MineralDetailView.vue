@@ -464,6 +464,14 @@
           <span class="btn-icon">🔄</span>
           前往交换站置换
         </button>
+        <button
+          v-if="mineralCount > 1"
+          class="btn btn-large batch-exchange-detail-btn"
+          @click="openBatchExchange"
+        >
+          <span class="btn-icon">♻️</span>
+          批量兑换 (多余 {{ mineralCount - 1 }} 份)
+        </button>
       </div>
     </div>
 
@@ -486,6 +494,12 @@
       :mineral-id="mineral?.id"
       @close="closeCoinFlow" 
     />
+
+    <BatchExchangeModal
+      :visible="showBatchExchange"
+      :focus-mineral-id="mineral?.id"
+      @close="showBatchExchange = false"
+    />
   </div>
 </template>
 
@@ -506,6 +520,7 @@ import { CATEGORY_CONFIG } from '@/data/research'
 import RatingStars from '@/components/RatingStars.vue'
 import PopularityBadge from '@/components/PopularityBadge.vue'
 import CoinFlowModal from '@/components/CoinFlowModal.vue'
+import BatchExchangeModal from '@/components/BatchExchangeModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -517,6 +532,7 @@ const researchStore = useResearchStore()
 const detectorStore = useDetectorStore()
 
 const showCoinFlow = ref(false)
+const showBatchExchange = ref(false)
 
 const getAnyMineralById = (id) => {
   const numericId = Number(id)
@@ -835,6 +851,11 @@ const goToMarket = () => {
 const goToExchange = () => {
   audioStore.playClick()
   router.push('/exchange')
+}
+
+const openBatchExchange = () => {
+  audioStore.playClick()
+  showBatchExchange.value = true
 }
 
 const listMineral = () => {
@@ -1214,6 +1235,14 @@ onMounted(() => {
   margin-top: 12px;
   background: linear-gradient(135deg, #0ea5e9, #06b6d4);
   box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+}
+
+.batch-exchange-detail-btn {
+  margin-top: 12px;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+  color: #000;
+  font-weight: 700;
 }
 
 .locked-content,

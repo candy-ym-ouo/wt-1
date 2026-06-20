@@ -215,6 +215,14 @@
           <span class="btn-icon">🔄</span>
           交换站
         </button>
+        <button
+          v-if="duplicateMineralCount > 0"
+          class="btn btn-small batch-exchange-btn"
+          @click="openBatchExchange"
+        >
+          <span class="btn-icon">♻️</span>
+          批量兑换 ({{ duplicateMineralCount }})
+        </button>
       </div>
 
       <div class="rarity-legend">
@@ -633,6 +641,11 @@
       </div>
     </div>
 
+    <BatchExchangeModal
+      :visible="showBatchExchange"
+      @close="showBatchExchange = false"
+    />
+
     <Teleport to="body">
       <Transition name="toast">
         <div v-if="toastMessage" class="detector-toast" :class="{ success: toastSuccess, error: !toastSuccess }">
@@ -648,6 +661,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import MineralCard from '@/components/MineralCard.vue'
 import DiscoveryLog from '@/components/DiscoveryLog.vue'
+import BatchExchangeModal from '@/components/BatchExchangeModal.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useMarketStore } from '@/stores/market'
@@ -684,6 +698,7 @@ const museumStore = useMuseumStore()
 const activeTab = ref('collection')
 const toastMessage = ref('')
 const toastSuccess = ref(true)
+const showBatchExchange = ref(false)
 let toastTimer = null
 
 const showToast = (message, success = true) => {
@@ -1083,6 +1098,15 @@ const goToWarehouse = () => {
 const goToResearch = () => {
   audioStore.playClick()
   router.push('/research')
+}
+
+const duplicateMineralCount = computed(() => {
+  return gameStore.collectedMinerals.filter(m => m.count > 1).length
+})
+
+const openBatchExchange = () => {
+  audioStore.playClick()
+  showBatchExchange.value = true
 }
 </script>
 
@@ -1648,6 +1672,17 @@ const goToResearch = () => {
 
 .exchange-entry-btn:hover {
   box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
+}
+
+.batch-exchange-btn {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+  color: #000;
+  font-weight: 700;
+}
+
+.batch-exchange-btn:hover {
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
 }
 
 .research-collection-entry-btn {

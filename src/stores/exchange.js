@@ -305,6 +305,95 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
+  const batchExchangeAll = (selectedMineralIds = null) => {
+    const duplicates = gameStore.collectedMinerals.filter(m => m.count > 1)
+    const toExchange = selectedMineralIds
+      ? duplicates.filter(m => selectedMineralIds.includes(m.id))
+      : duplicates
+
+    if (toExchange.length === 0) {
+      return { success: false, message: '无可置换的重复藏品' }
+    }
+
+    let totalPointsGained = 0
+    let totalCoinsGained = 0
+    let totalTaxPaid = 0
+    let totalExchangeCount = 0
+    const exchangedDetails = []
+
+    for (const mineral of toExchange) {
+      const exchangeCount = mineral.count - 1
+      if (exchangeCount <= 0) continue
+
+      const pointValue = getExchangePointValue(mineral.rarity)
+      const totalBase = pointValue * exchangeCount
+      const afterTax = Math.round(totalBase * (1 - EXCHANGE_TAX_RATE))
+      const taxAmount = totalBase - afterTax
+
+      mineral.count = 1
+
+      exchangePoints.value += afterTax
+      const coinBonus = Math.round(afterTax * 0.5)
+      gameStore.coins += coinBonus
+
+      gameStore.addCoinTransaction('exchange_bonus', coinBonus, `批量置换 ${mineral.name} x${exchangeCount}`, {
+        mineralId: mineral.id,
+        mineralName: mineral.name,
+        mineralEmoji: mineral.emoji,
+        rarity: mineral.rarity,
+        exchangeType: 'batch_duplicate',
+        count: exchangeCount,
+        pointsGained: afterTax,
+        taxPaid: taxAmount
+      })
+
+      totalPointsGained += afterTax
+      totalCoinsGained += coinBonus
+      totalTaxPaid += taxAmount
+      totalExchangeCount += exchangeCount
+
+      exchangedDetails.push({
+        id: mineral.id,
+        name: mineral.name,
+        emoji: mineral.emoji,
+        rarity: mineral.rarity,
+        count: exchangeCount,
+        pointsGained: afterTax,
+        coinsGained: coinBonus
+      })
+    }
+
+    const record = {
+      id: Date.now(),
+      type: 'batch_duplicate',
+      count: totalExchangeCount,
+      mineralCount: exchangedDetails.length,
+      pointsGained: totalPointsGained,
+      coinsGained: totalCoinsGained,
+      taxPaid: totalTaxPaid,
+      details: exchangedDetails,
+      timestamp: Date.now()
+    }
+    exchangeHistory.value.unshift(record)
+    if (exchangeHistory.value.length > MAX_EXCHANGE_HISTORY) {
+      exchangeHistory.value = exchangeHistory.value.slice(0, MAX_EXCHANGE_HISTORY)
+    }
+
+    gameStore.emitTaskEvent('coinsEarned', totalCoinsGained)
+    gameStore.saveProgress()
+    saveExchangeData()
+
+    return {
+      success: true,
+      totalPointsGained,
+      totalCoinsGained,
+      totalTaxPaid,
+      totalExchangeCount,
+      exchangedDetails,
+      exchangedMineralCount: exchangedDetails.length
+    }
+  }
+
   const setActiveTab = (tab) => {
     activeTab.value = tab
   }
@@ -347,6 +436,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     getRiskWarnings,
     exchangeDuplicate,
     exchangeRarityConversion,
+    batchExchangeAll,
     setActiveTab,
     saveExchangeData,
     loadExchangeData,

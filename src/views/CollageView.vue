@@ -55,6 +55,15 @@
         >
           选择指定矿物
         </button>
+
+        <button
+          v-if="duplicateMineralCount > 0"
+          class="btn btn-secondary batch-exchange-entry"
+          @click="showBatchExchange = true"
+        >
+          <span class="btn-icon">♻️</span>
+          批量兑换重复矿物 ({{ duplicateMineralCount }})
+        </button>
       </div>
     </div>
 
@@ -94,6 +103,7 @@
       :mineral="newMineral"
       :is-new="isNewMineral"
       @close="closeModal"
+      @batch-exchange="onNewMineralBatchExchange"
     />
 
     <div v-if="showMineralSelect" class="mineral-select-overlay" @click.self="closeMineralSelect">
@@ -225,6 +235,12 @@
         </div>
       </div>
     </div>
+
+    <BatchExchangeModal
+      :visible="showBatchExchange"
+      @close="showBatchExchange = false"
+      @exchanged="onBatchExchanged"
+    />
   </div>
 </template>
 
@@ -233,13 +249,16 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import PixiCollage from '@/components/PixiCollage.vue'
 import NewMineralModal from '@/components/NewMineralModal.vue'
+import BatchExchangeModal from '@/components/BatchExchangeModal.vue'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
+import { useExchangeStore } from '@/stores/exchange'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 
 const router = useRouter()
 const gameStore = useGameStore()
 const audioStore = useAudioStore()
+const exchangeStore = useExchangeStore()
 
 const currentMineral = ref(null)
 const pieces = ref([])
@@ -247,6 +266,7 @@ const showMineralSelect = ref(false)
 const showExitConfirm = ref(false)
 const showResetConfirm = ref(false)
 const showCoinShortage = ref(false)
+const showBatchExchange = ref(false)
 const lastSaveTime = ref(null)
 const isResuming = ref(false)
 const searchQuery = ref('')
@@ -292,6 +312,10 @@ const getShortage = (mineral) => {
 
 const affordableCount = computed(() => {
   return uncollectedMinerals.value.filter(m => canAfford(m)).length
+})
+
+const duplicateMineralCount = computed(() => {
+  return gameStore.collectedMinerals.filter(m => m.count > 1).length
 })
 
 const filteredMinerals = computed(() => {
@@ -416,6 +440,15 @@ const goEarnCoins = () => {
   showCoinShortage.value = false
   showMineralSelect.value = false
   router.push('/expedition')
+}
+
+const onBatchExchanged = () => {
+  gameStore.saveProgress()
+}
+
+const onNewMineralBatchExchange = () => {
+  closeModal()
+  showBatchExchange.value = true
 }
 
 const onCollageComplete = () => {
@@ -736,6 +769,18 @@ onBeforeUnmount(() => {
 .start-btn {
   width: 100%;
   margin-bottom: 12px;
+}
+
+.batch-exchange-entry {
+  width: 100%;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.1));
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.batch-exchange-entry:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.15));
+  border-color: rgba(245, 158, 11, 0.5);
 }
 
 .btn-large {

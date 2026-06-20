@@ -34,6 +34,72 @@
       </div>
     </div>
 
+    <div class="showcase-cards">
+      <div class="showcase-card recent-unlock" @click="viewRecentUnlock">
+        <div class="card-header">
+          <span class="card-icon">🔓</span>
+          <span class="card-title">最近解锁</span>
+        </div>
+        <div v-if="recentUnlock" class="card-content">
+          <span class="card-emoji">{{ recentUnlock.mineral.emoji }}</span>
+          <div class="card-info">
+            <span class="card-name">{{ recentUnlock.mineral.name }}</span>
+            <span class="card-sub">
+              <span class="card-source-icon">{{ recentUnlock.sourceIcon }}</span>
+              {{ recentUnlock.sourceName }} · {{ formatTime(recentUnlock.timestamp) }}
+            </span>
+          </div>
+          <span :class="['card-rarity', `rarity-${recentUnlock.mineral.rarity}`]">
+            {{ getRarityName(recentUnlock.mineral.rarity) }}
+          </span>
+        </div>
+        <div v-else class="card-empty">
+          <span class="empty-text">暂无解锁记录</span>
+        </div>
+      </div>
+
+      <div class="showcase-card highest-rarity" @click="viewHighestRarity">
+        <div class="card-header">
+          <span class="card-icon">⭐</span>
+          <span class="card-title">最高稀有度</span>
+        </div>
+        <div v-if="highestRarityMineral" class="card-content">
+          <span class="card-emoji">{{ highestRarityMineral.emoji }}</span>
+          <div class="card-info">
+            <span class="card-name">{{ highestRarityMineral.name }}</span>
+            <span class="card-sub">
+              收集于 {{ formatCollectedAt(highestRarityMineral.collectedAt) }}
+            </span>
+          </div>
+          <span :class="['card-rarity', `rarity-${highestRarityMineral.rarity}`]">
+            {{ getRarityName(highestRarityMineral.rarity) }}
+          </span>
+        </div>
+        <div v-else class="card-empty">
+          <span class="empty-text">暂无收集记录</span>
+        </div>
+      </div>
+
+      <div class="showcase-card consecutive-days">
+        <div class="card-header">
+          <span class="card-icon">🔥</span>
+          <span class="card-title">连续拼装</span>
+        </div>
+        <div class="card-content">
+          <span class="streak-value">{{ consecutiveCollageDays }}</span>
+          <div class="streak-info">
+            <span class="streak-label">连续天数</span>
+            <span class="streak-sub">
+              {{ consecutiveCollageDays > 0 ? '继续保持！' : '今天还没拼装哦' }}
+            </span>
+          </div>
+          <span class="streak-fire">
+            {{ '🔥'.repeat(Math.min(consecutiveCollageDays, 7)) }}
+          </span>
+        </div>
+      </div>
+    </div>
+
     <div class="task-overview" @click="goToTasks">
       <div class="task-overview-header">
         <h3 class="overview-title">⛏️ 任务中心</h3>
@@ -161,9 +227,13 @@ const dailyCompletionRate = computed(() => taskStore.dailyCompletionRate)
 const weeklyCompletionRate = computed(() => taskStore.weeklyCompletionRate)
 const achievementStats = computed(() => taskStore.totalAchievementCount)
 
+const recentUnlock = computed(() => gameStore.recentUnlock)
+const highestRarityMineral = computed(() => gameStore.highestRarityMineral)
+const consecutiveCollageDays = computed(() => gameStore.consecutiveCollageDays)
+
 const collectedMinerals = computed(() => {
   return [...gameStore.collectedMinerals].sort((a, b) => {
-    const rarityOrder = { legenday: 0, epic: 1, rare: 2, uncommon: 3, common: 4 }
+    const rarityOrder = { legendary: 0, epic: 1, rare: 2, uncommon: 3, common: 4 }
     return (rarityOrder[a.rarity] || 5) - (rarityOrder[b.rarity] || 5)
   })
 })
@@ -185,6 +255,18 @@ const formatTime = (timestamp) => {
   return `${Math.floor(diff / 86400000)}天前`
 }
 
+const formatCollectedAt = (timestamp) => {
+  if (!timestamp) return '未知'
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now - date
+  
+  if (diff < 86400000) return '今天'
+  if (diff < 172800000) return '昨天'
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`
+  return `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
 const startNewCollage = () => {
   audioStore.playClick()
   audioStore.initAudioContext()
@@ -199,6 +281,18 @@ const goToTasks = () => {
 const viewMineralDetail = (mineral) => {
   audioStore.playClick()
   router.push(`/mineral/${mineral.id}`)
+}
+
+const viewRecentUnlock = () => {
+  if (!recentUnlock.value) return
+  audioStore.playClick()
+  router.push(`/mineral/${recentUnlock.value.mineral.id}`)
+}
+
+const viewHighestRarity = () => {
+  if (!highestRarityMineral.value) return
+  audioStore.playClick()
+  router.push(`/mineral/${highestRarityMineral.value.id}`)
 }
 
 const confirmReset = () => {
@@ -566,6 +660,174 @@ const confirmReset = () => {
   }
 }
 
+.showcase-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.showcase-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.showcase-card:hover {
+  border-color: rgba(233, 69, 96, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-icon {
+  font-size: 18px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.card-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-emoji {
+  font-size: 36px;
+  flex-shrink: 0;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-source-icon {
+  font-size: 12px;
+}
+
+.card-rarity {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.rarity-common { color: #9ca3af; }
+.rarity-uncommon { color: #22c55e; }
+.rarity-rare { color: #3b82f6; }
+.rarity-epic { color: #a855f7; }
+.rarity-legendary { color: #f59e0b; }
+
+.card-empty {
+  text-align: center;
+  padding: 16px;
+}
+
+.empty-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.recent-unlock {
+  border-left: 3px solid #10b981;
+}
+
+.highest-rarity {
+  border-left: 3px solid #f59e0b;
+}
+
+.consecutive-days {
+  border-left: 3px solid #ef4444;
+  cursor: default;
+}
+
+.consecutive-days:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.streak-value {
+  font-size: 42px;
+  font-weight: 800;
+  color: #ef4444;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.streak-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.streak-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.streak-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.streak-fire {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 600px) {
+  .showcase-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .consecutive-days {
+    grid-column: span 2;
+  }
+}
+
 @media (min-width: 900px) {
   .minerals-grid {
     grid-template-columns: repeat(4, 1fr);
@@ -573,6 +835,14 @@ const confirmReset = () => {
   
   .stats-section {
     grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .showcase-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .consecutive-days {
+    grid-column: span 1;
   }
 }
 </style>

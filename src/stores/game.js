@@ -174,6 +174,59 @@ export const useGameStore = defineStore('game', () => {
     }
   })
 
+  const recentUnlock = computed(() => {
+    if (discoveryLogs.value.length === 0) return null
+    const recentLog = discoveryLogs.value.find(log => log.rewards.isNew)
+    if (!recentLog) return null
+    const mineral = getMineralById(recentLog.mineralId)
+    if (!mineral) return null
+    return {
+      mineral,
+      source: recentLog.source,
+      sourceName: recentLog.sourceName,
+      sourceIcon: recentLog.sourceIcon,
+      sourceColor: recentLog.sourceColor,
+      timestamp: recentLog.timestamp
+    }
+  })
+
+  const highestRarityMineral = computed(() => {
+    if (collectedMinerals.value.length === 0) return null
+    const rarityLevel = (rarity) => {
+      const levels = { legendary: 4, epic: 3, rare: 2, uncommon: 1, common: 0 }
+      return levels[rarity] ?? -1
+    }
+    const sorted = [...collectedMinerals.value].sort((a, b) => {
+      const levelDiff = rarityLevel(b.rarity) - rarityLevel(a.rarity)
+      if (levelDiff !== 0) return levelDiff
+      return (b.collectedAt || 0) - (a.collectedAt || 0)
+    })
+    return sorted[0]
+  })
+
+  const consecutiveCollageDays = computed(() => {
+    if (completedCollages.value.length === 0) return 0
+    const collageDays = new Set()
+    completedCollages.value.forEach(collage => {
+      const date = new Date(collage.completedAt)
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      collageDays.add(dateKey)
+    })
+    const today = new Date()
+    let streak = 0
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(today)
+      checkDate.setDate(checkDate.getDate() - i)
+      const dateKey = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}-${String(checkDate.getDate()).padStart(2, '0')}`
+      if (collageDays.has(dateKey)) {
+        streak++
+      } else if (i > 0) {
+        break
+      }
+    }
+    return streak
+  })
+
   const allLocations = computed(() => EXPEDITION_LOCATIONS)
 
   const canStartExpedition = computed(() => {
@@ -1458,6 +1511,9 @@ export const useGameStore = defineStore('game', () => {
     collectionProgress,
     staminaPercentage,
     expeditionProgress,
+    recentUnlock,
+    highestRarityMineral,
+    consecutiveCollageDays,
     canStartExpedition,
     isMineralCollected,
     collectMineral,

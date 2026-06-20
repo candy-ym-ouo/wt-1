@@ -7,7 +7,8 @@
         collected: isCollected, 
         locked: !isCollected && !showLocked, 
         'is-favorite': isFavorite,
-        'new-discovery': isNew
+        'new-discovery': isNew,
+        'showing-clues': showingClues
       }
     ]"
     :style="cardStyle"
@@ -39,6 +40,41 @@
       <div class="locked-overlay" v-if="!isCollected">
         <span class="lock-icon">🔒</span>
         <span class="lock-text">未收集</span>
+        <button 
+          class="clue-toggle-btn" 
+          @click.stop="toggleClues"
+          v-if="showClueButton"
+        >
+          <span class="clue-icon">💡</span>
+          <span class="clue-btn-text">{{ showingClues ? '收起线索' : '查看线索' }}</span>
+        </button>
+      </div>
+      <div class="clues-panel" v-if="!isCollected && showingClues && mineral.clues">
+        <div class="clue-section">
+          <div class="clue-section-title">
+            <span class="clue-section-icon">⛏️</span>
+            <span>可能产出</span>
+          </div>
+          <ul class="clue-list">
+            <li v-for="(item, idx) in mineral.clues.production" :key="idx">{{ item }}</li>
+          </ul>
+        </div>
+        <div class="clue-section">
+          <div class="clue-section-title">
+            <span class="clue-section-icon">🎮</span>
+            <span>推荐玩法</span>
+          </div>
+          <ul class="clue-list">
+            <li v-for="(item, idx) in mineral.clues.gameplay" :key="idx">{{ item }}</li>
+          </ul>
+        </div>
+        <div class="clue-section reward-section">
+          <div class="clue-section-title">
+            <span class="clue-section-icon">🎁</span>
+            <span>目标奖励</span>
+          </div>
+          <p class="clue-reward-text">{{ mineral.clues.reward }}</p>
+        </div>
       </div>
     </div>
     <div
@@ -61,7 +97,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 
 const props = defineProps({
@@ -108,10 +144,20 @@ const props = defineProps({
   isNew: {
     type: Boolean,
     default: false
+  },
+  showClueButton: {
+    type: Boolean,
+    default: true
   }
 })
 
 const emit = defineEmits(['click'])
+
+const showingClues = ref(false)
+
+const toggleClues = () => {
+  showingClues.value = !showingClues.value
+}
 
 const rarityConfig = computed(() => RARITY_CONFIG[props.mineral.rarity])
 const rarityName = computed(() => rarityConfig.value.name)
@@ -429,5 +475,122 @@ const handleClick = () => {
   50% { 
     filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.8)) drop-shadow(0 0 30px rgba(34, 197, 94, 0.4));
   }
+}
+
+.mineral-card.showing-clues {
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+}
+
+.locked-overlay {
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.clue-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.1));
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 8px;
+}
+
+.clue-toggle-btn:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.2));
+  border-color: rgba(251, 191, 36, 0.6);
+  transform: scale(1.05);
+}
+
+.clue-icon {
+  font-size: 14px;
+}
+
+.clues-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  z-index: 10;
+  animation: cluesSlideIn 0.3s ease;
+}
+
+@keyframes cluesSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.clue-section {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.clue-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 8px;
+}
+
+.clue-section-icon {
+  font-size: 14px;
+}
+
+.clue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.clue-list li {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding-left: 4px;
+  border-left: 2px solid rgba(251, 191, 36, 0.3);
+  padding-left: 8px;
+}
+
+.reward-section {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.clue-reward-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
 }
 </style>

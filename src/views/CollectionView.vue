@@ -310,7 +310,7 @@
           <div 
             v-for="mineral in filteredMinerals"
             :key="mineral.id"
-            :class="['list-item', { collected: isMineralCollected(mineral.id) }]"
+            :class="['list-item', { collected: isMineralCollected(mineral.id), 'showing-clues': showingCluesList[mineral.id] }]"
             @click="viewMineralDetail(mineral)"
           >
             <div class="item-emoji-wrap">
@@ -338,6 +338,20 @@
                 <span class="meta-item">硬度: {{ mineral.hardness }}</span>
                 <span class="meta-item">数量: {{ getMineralCount(mineral.id) }}</span>
               </div>
+              <div v-if="!isMineralCollected(mineral.id) && showingCluesList[mineral.id] && mineral.clues" class="list-clues-panel">
+                <div class="list-clue-row">
+                  <span class="list-clue-label">⛏️ 可能产出</span>
+                  <span class="list-clue-value">{{ mineral.clues.production.join(' / ') }}</span>
+                </div>
+                <div class="list-clue-row">
+                  <span class="list-clue-label">🎮 推荐玩法</span>
+                  <span class="list-clue-value">{{ mineral.clues.gameplay.join(' / ') }}</span>
+                </div>
+                <div class="list-clue-row reward-row">
+                  <span class="list-clue-label">🎁 目标奖励</span>
+                  <span class="list-clue-value">{{ mineral.clues.reward }}</span>
+                </div>
+              </div>
             </div>
             <div class="item-actions" v-if="isMineralCollected(mineral.id)" @click.stop>
               <button 
@@ -348,7 +362,16 @@
                 📤 上架
               </button>
             </div>
-            <span class="item-arrow" v-else>›</span>
+            <div v-else class="uncollected-actions" @click.stop>
+              <button 
+                class="list-clue-toggle-btn"
+                @click="toggleListClues(mineral.id)"
+              >
+                <span class="clue-icon">💡</span>
+                <span>{{ showingCluesList[mineral.id] ? '收起' : '线索' }}</span>
+              </button>
+              <span class="item-arrow">›</span>
+            </div>
           </div>
         </div>
       </div>
@@ -670,6 +693,74 @@
       @close="showBatchExchange = false"
     />
 
+    <div v-if="showUncollectedClueModal && currentUncollectedMineral" class="uncollected-clue-overlay" @click.self="closeUncollectedClueModal">
+      <div class="uncollected-clue-modal">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <span class="modal-mineral-emoji">❓</span>
+            <div class="modal-title-info">
+              <h3 class="modal-title">神秘矿物线索</h3>
+              <span :class="['modal-rarity', `rarity-${currentUncollectedMineral.rarity}`]">
+                {{ RARITY_CONFIG[currentUncollectedMineral.rarity].name }} {{ getRarityStars(currentUncollectedMineral.rarity) }}
+              </span>
+            </div>
+          </div>
+          <button class="modal-close-btn" @click="closeUncollectedClueModal">✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="clue-hint-banner">
+            <span class="hint-icon">💡</span>
+            <span class="hint-text">收集后解锁完整矿物详情</span>
+          </div>
+
+          <div v-if="currentUncollectedMineral.clues" class="clue-sections">
+            <div class="detail-clue-section">
+              <div class="detail-clue-header">
+                <span class="detail-clue-icon">⛏️</span>
+                <span class="detail-clue-title">可能产出</span>
+              </div>
+              <ul class="detail-clue-list">
+                <li v-for="(item, idx) in currentUncollectedMineral.clues.production" :key="idx">{{ item }}</li>
+              </ul>
+            </div>
+
+            <div class="detail-clue-section">
+              <div class="detail-clue-header">
+                <span class="detail-clue-icon">🎮</span>
+                <span class="detail-clue-title">推荐玩法</span>
+              </div>
+              <ul class="detail-clue-list">
+                <li v-for="(item, idx) in currentUncollectedMineral.clues.gameplay" :key="idx">{{ item }}</li>
+              </ul>
+            </div>
+
+            <div class="detail-clue-section reward-clue-section">
+              <div class="detail-clue-header">
+                <span class="detail-clue-icon">🎁</span>
+                <span class="detail-clue-title">目标奖励</span>
+              </div>
+              <p class="detail-clue-reward">{{ currentUncollectedMineral.clues.reward }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeUncollectedClueModal">
+            知道了
+          </button>
+          <button class="btn" @click="goToCollage">
+            <span class="btn-icon">🎨</span>
+            去拼装
+          </button>
+          <button class="btn expedition-btn" @click="goToExpedition">
+            <span class="btn-icon">🗺️</span>
+            去探险
+          </button>
+        </div>
+      </div>
+    </div>
+
     <Teleport to="body">
       <Transition name="toast">
         <div v-if="toastMessage" class="detector-toast" :class="{ success: toastSuccess, error: !toastSuccess }">
@@ -694,7 +785,7 @@ import { useDetectorStore } from '@/stores/detector'
 import { useResearchStore } from '@/stores/research'
 import { useMuseumStore } from '@/stores/museum'
 import { useExchangeStore } from '@/stores/exchange'
-import { RARITY_CONFIG, RARITY } from '@/data/rarity'
+import { RARITY_CONFIG, RARITY, getRarityStars } from '@/data/rarity'
 import { 
   MINERALS, 
   ORIGIN_FILTERS, 
@@ -725,7 +816,16 @@ const activeTab = ref('collection')
 const toastMessage = ref('')
 const toastSuccess = ref(true)
 const showBatchExchange = ref(false)
+const showingCluesList = ref({})
 let toastTimer = null
+
+const toggleListClues = (mineralId) => {
+  audioStore.playClick()
+  showingCluesList.value = {
+    ...showingCluesList.value,
+    [mineralId]: !showingCluesList.value[mineralId]
+  }
+}
 
 const showToast = (message, success = true) => {
   toastMessage.value = message
@@ -1056,13 +1156,33 @@ const getRarityCount = (rarity) => {
   return `${collected}/${total}`
 }
 
+const showUncollectedClueModal = ref(false)
+const currentUncollectedMineral = ref(null)
+
 const viewMineralDetail = (mineral) => {
   if (!isMineralCollected(mineral.id)) {
-    audioStore.playError()
+    audioStore.playClick()
+    currentUncollectedMineral.value = mineral
+    showUncollectedClueModal.value = true
     return
   }
   audioStore.playClick()
   router.push(`/mineral/${mineral.id}`)
+}
+
+const closeUncollectedClueModal = () => {
+  showUncollectedClueModal.value = false
+  currentUncollectedMineral.value = null
+}
+
+const goToCollage = () => {
+  closeUncollectedClueModal()
+  router.push('/collage')
+}
+
+const goToExpedition = () => {
+  closeUncollectedClueModal()
+  router.push('/expedition')
 }
 
 const getMineralCount = (id) => {
@@ -2853,5 +2973,302 @@ const openBatchExchange = () => {
   .af-row {
     grid-template-columns: 1fr;
   }
+}
+
+.list-item.showing-clues {
+  border-color: rgba(251, 191, 36, 0.4) !important;
+  background: linear-gradient(135deg, var(--bg-card), rgba(251, 191, 36, 0.05));
+}
+
+.uncollected-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.list-clue-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.08));
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.list-clue-toggle-btn:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.15));
+  border-color: rgba(251, 191, 36, 0.6);
+  transform: scale(1.05);
+}
+
+.list-clue-toggle-btn .clue-icon {
+  font-size: 13px;
+}
+
+.list-clues-panel {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(251, 191, 36, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: listCluesSlide 0.3s ease;
+}
+
+@keyframes listCluesSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.list-clue-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.list-clue-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fbbf24;
+  min-width: 70px;
+}
+
+.list-clue-value {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.reward-row .list-clue-value {
+  color: #fde68a;
+  font-weight: 500;
+}
+
+.uncollected-clue-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: overlayFadeIn 0.2s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.uncollected-clue-modal {
+  background: var(--bg-card);
+  border-radius: 20px;
+  max-width: 400px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  box-shadow: 0 0 40px rgba(251, 191, 36, 0.15);
+  animation: modalSlideUp 0.3s ease;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-mineral-emoji {
+  font-size: 40px;
+}
+
+.modal-title-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-rarity {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  align-self: flex-start;
+}
+
+.modal-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.clue-hint-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.06));
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.hint-icon {
+  font-size: 18px;
+}
+
+.hint-text {
+  font-size: 13px;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.clue-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-clue-section {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.reward-clue-section {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.detail-clue-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.detail-clue-icon {
+  font-size: 16px;
+}
+
+.detail-clue-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.detail-clue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-clue-list li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding-left: 12px;
+  border-left: 2px solid rgba(251, 191, 36, 0.3);
+}
+
+.detail-clue-reward {
+  font-size: 13px;
+  color: #fde68a;
+  line-height: 1.6;
+  margin: 0;
+  font-weight: 500;
+}
+
+.modal-footer {
+  flex-shrink: 0;
+  padding: 16px 20px 20px;
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-footer .btn {
+  flex: 1;
+}
+
+.expedition-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.expedition-btn:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
 }
 </style>

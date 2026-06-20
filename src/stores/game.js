@@ -24,6 +24,10 @@ export const useGameStore = defineStore('game', () => {
   const showNewMineralModal = ref(false)
   const newMineral = ref(null)
   const isNewMineral = ref(false)
+  const showFirstDiscoveryCelebration = ref(false)
+  const firstDiscoveryMineral = ref(null)
+  const firstDiscoveryRewards = ref(null)
+  const newlyDiscoveredMinerals = ref([])
   
   const stamina = ref(100)
   const maxStamina = ref(100)
@@ -472,6 +476,21 @@ export const useGameStore = defineStore('game', () => {
         isNew: true
       }, events)
       
+      newlyDiscoveredMinerals.value.push({
+        mineralId: mineral.id,
+        discoveredAt: Date.now()
+      })
+      
+      const rarityLevel = getRarityLevel(mineral.rarity)
+      if (rarityLevel >= 2) {
+        firstDiscoveryMineral.value = mineral
+        firstDiscoveryRewards.value = {
+          coins: earnedCoins,
+          exp: extraExp
+        }
+        showFirstDiscoveryCelebration.value = true
+      }
+      
       saveProgress()
       return true
     } else {
@@ -683,7 +702,13 @@ export const useGameStore = defineStore('game', () => {
 
       newMineral.value = mineral
       isNewMineral.value = wasNew
-      showNewMineralModal.value = true
+      
+      const rarityLevel = getRarityLevel(mineral.rarity)
+      const isRareFirstDiscovery = wasNew && rarityLevel >= 2
+      
+      if (!isRareFirstDiscovery) {
+        showNewMineralModal.value = true
+      }
 
       emitTaskEvent('collageComplete')
 
@@ -1370,6 +1395,32 @@ export const useGameStore = defineStore('game', () => {
 
   const getLocation = (id) => getLocationById(id)
 
+  const closeFirstDiscoveryCelebration = () => {
+    showFirstDiscoveryCelebration.value = false
+    firstDiscoveryMineral.value = null
+    firstDiscoveryRewards.value = null
+    if (currentCollage.value) {
+      currentCollage.value = null
+      collagePieces.value = []
+      collageStartTime.value = null
+    }
+  }
+
+  const isNewlyDiscovered = (mineralId) => {
+    const entry = newlyDiscoveredMinerals.value.find(n => n.mineralId === mineralId)
+    if (!entry) return false
+    const oneHourAgo = Date.now() - 60 * 60 * 1000
+    return entry.discoveredAt > oneHourAgo
+  }
+
+  const markAsViewed = (mineralId) => {
+    const index = newlyDiscoveredMinerals.value.findIndex(n => n.mineralId === mineralId)
+    if (index > -1) {
+      newlyDiscoveredMinerals.value.splice(index, 1)
+      saveProgress()
+    }
+  }
+
   return {
     collectedMinerals,
     currentCollage,
@@ -1381,6 +1432,10 @@ export const useGameStore = defineStore('game', () => {
     showNewMineralModal,
     newMineral,
     isNewMineral,
+    showFirstDiscoveryCelebration,
+    firstDiscoveryMineral,
+    firstDiscoveryRewards,
+    newlyDiscoveredMinerals,
     stamina,
     maxStamina,
     staminaRegenRate,
@@ -1411,6 +1466,9 @@ export const useGameStore = defineStore('game', () => {
     updatePiecePosition,
     checkCollageComplete,
     closeNewMineralModal,
+    closeFirstDiscoveryCelebration,
+    isNewlyDiscovered,
+    markAsViewed,
     resetCurrentCollage,
     saveProgress,
     loadProgress,

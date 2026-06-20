@@ -151,6 +151,67 @@ export const useAudioStore = defineStore('audio', () => {
     setTimeout(() => playTone(1567.98, 0.4, 'sine', 0.5), 600)
   }
 
+  const playFirstDiscovery = (rarity = 'rare') => {
+    initAudioContext()
+    
+    const introNotes = [523.25, 659.25, 783.99]
+    introNotes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.15, 'sine', 0.3), i * 100)
+    })
+    
+    setTimeout(() => {
+      const fanfareNotes = {
+        common: [783.99, 987.77, 1174.66],
+        uncommon: [783.99, 987.77, 1174.66, 1318.51],
+        rare: [659.25, 783.99, 987.77, 1174.66, 1318.51],
+        epic: [523.25, 659.25, 783.99, 987.77, 1174.66, 1318.51],
+        legendary: [523.25, 659.25, 783.99, 987.77, 1174.66, 1318.51, 1567.98, 2093.00]
+      }
+      const notes = fanfareNotes[rarity] || fanfareNotes.rare
+      
+      notes.forEach((note, i) => {
+        setTimeout(() => {
+          playTone(note, 0.25, 'sine', 0.5)
+          if (i < notes.length - 1) {
+            setTimeout(() => playTone(note * 1.5, 0.1, 'triangle', 0.2), 50)
+          }
+        }, i * 120)
+      })
+      
+      setTimeout(() => {
+        const finalNote = notes[notes.length - 1]
+        playTone(finalNote, 0.6, 'sine', 0.6)
+        playTone(finalNote * 2, 0.4, 'triangle', 0.3)
+        setTimeout(() => playTone(finalNote * 1.25, 0.3, 'sine', 0.4), 150)
+      }, notes.length * 120)
+    }, 350)
+    
+    setTimeout(() => {
+      const chordNotes = [523.25, 659.25, 783.99]
+      chordNotes.forEach(note => {
+        playTone(note, 0.8, 'sine', 0.15)
+      })
+    }, 800)
+  }
+
+  const playAchievementUnlock = () => {
+    initAudioContext()
+    const notes = [783.99, 987.77, 1174.66, 1318.51]
+    notes.forEach((note, i) => {
+      setTimeout(() => playTone(note, 0.2, 'sine', 0.5), i * 100)
+    })
+    setTimeout(() => {
+      playTone(1567.98, 0.4, 'sine', 0.6)
+      setTimeout(() => playTone(2093.00, 0.3, 'triangle', 0.4), 100)
+    }, 450)
+  }
+
+  const playSparkle = () => {
+    initAudioContext()
+    playTone(1567.98, 0.08, 'sine', 0.2)
+    setTimeout(() => playTone(2093.00, 0.08, 'sine', 0.15), 50)
+  }
+
   const playLevelUp = () => {
     initAudioContext()
     const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00]
@@ -407,6 +468,9 @@ export const useAudioStore = defineStore('audio', () => {
     playChoiceSuccess,
     playChoiceFailure,
     playReward,
+    playFirstDiscovery,
+    playAchievementUnlock,
+    playSparkle,
     playLevelUp,
     playStaminaLow,
     playExploreStep,

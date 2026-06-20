@@ -3,15 +3,24 @@
     class="mineral-card"
     :class="[
       `rarity-${mineral.rarity}`,
-      { collected: isCollected, locked: !isCollected && !showLocked, 'is-favorite': isFavorite }
+      { 
+        collected: isCollected, 
+        locked: !isCollected && !showLocked, 
+        'is-favorite': isFavorite,
+        'new-discovery': isNew
+      }
     ]"
     :style="cardStyle"
     @click="handleClick"
   >
     <div class="card-glow" v-if="isCollected && glow"></div>
+    <div class="new-discovery-glow" v-if="isNew"></div>
+    <div class="new-discovery-badge" v-if="isNew">
+      <span class="nd-text">NEW!</span>
+    </div>
     <div class="card-inner">
       <div class="card-header">
-        <span class="mineral-emoji" :class="{ 'animate-float': isCollected }">
+        <span class="mineral-emoji" :class="{ 'animate-float': isCollected, 'new-shine': isNew }">
           {{ displayEmoji }}
         </span>
         <div class="header-right">
@@ -95,6 +104,10 @@ const props = defineProps({
   showFavoriteBadge: {
     type: Boolean,
     default: true
+  },
+  isNew: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -348,5 +361,73 @@ const handleClick = () => {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.new-discovery-glow {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: linear-gradient(135deg, #22c55e, #10b981, #14b8a6);
+  border-radius: 18px;
+  z-index: -1;
+  filter: blur(8px);
+  opacity: 0.6;
+  animation: newDiscoveryPulse 2s ease-in-out infinite;
+}
+
+@keyframes newDiscoveryPulse {
+  0%, 100% { 
+    opacity: 0.4; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(1.02);
+  }
+}
+
+.new-discovery-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 3;
+  background: linear-gradient(135deg, #22c55e, #10b981);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.5);
+  animation: newBadgeBounce 1.5s ease-in-out infinite;
+}
+
+@keyframes newBadgeBounce {
+  0%, 100% { transform: scale(1) rotate(-3deg); }
+  50% { transform: scale(1.1) rotate(3deg); }
+}
+
+.mineral-card.new-discovery {
+  animation: newCardPulse 3s ease-in-out infinite;
+}
+
+@keyframes newCardPulse {
+  0%, 100% { box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2); }
+  50% { box-shadow: 0 8px 30px rgba(34, 197, 94, 0.4); }
+}
+
+.mineral-emoji.new-shine {
+  animation: newShine 2s ease-in-out infinite;
+}
+
+@keyframes newShine {
+  0%, 100% { 
+    filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.6));
+  }
+  50% { 
+    filter: drop-shadow(0 0 20px rgba(34, 197, 94, 0.8)) drop-shadow(0 0 30px rgba(34, 197, 94, 0.4));
+  }
 }
 </style>

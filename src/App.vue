@@ -73,6 +73,15 @@
       :result="seasonStore.settlementResult"
       @close="seasonStore.closeSettlementModal"
     />
+
+    <FirstDiscoveryCelebration
+      :visible="gameStore.showFirstDiscoveryCelebration"
+      :mineral="gameStore.firstDiscoveryMineral"
+      :coin-reward="gameStore.firstDiscoveryRewards?.coins || 0"
+      :exp-reward="gameStore.firstDiscoveryRewards?.exp || 0"
+      achievement-text="矿物收藏家"
+      @close="gameStore.closeFirstDiscoveryCelebration"
+    />
     
     <CoinFlowModal 
       :visible="showCoinFlow" 
@@ -121,6 +130,7 @@ import { useResearchStore } from './stores/research'
 import { useAuctionStore } from './stores/auction'
 import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
 import CoinFlowModal from './components/CoinFlowModal.vue'
+import FirstDiscoveryCelebration from './components/FirstDiscoveryCelebration.vue'
 import { useRouter } from 'vue-router'
 import { MINERALS } from './data/minerals'
 import { SEASONS } from './data/season'

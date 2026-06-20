@@ -90,6 +90,7 @@
           :glow="mineral.rarity === 'legendary'"
           :show-stats="true"
           :is-favorite="museumStore.isFavorite(mineral.id)"
+          :is-new="gameStore.isNewlyDiscovered(mineral.id)"
           @click="viewMineralDetail"
         />
       </div>

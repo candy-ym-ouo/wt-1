@@ -18,46 +18,66 @@ export const SOURCE_TYPES = {
   RESEARCH: 'research'
 }
 
+export const SOURCE_CATEGORY = {
+  RANDOM_DROP: 'random_drop',
+  DIRECT_PURCHASE: 'direct_purchase',
+  EVENT_REWARD: 'event_reward'
+}
+
+export const SOURCE_CATEGORY_CONFIG = {
+  [SOURCE_CATEGORY.RANDOM_DROP]: { name: '随机掉落', emoji: '🎲', color: '#8b5cf6' },
+  [SOURCE_CATEGORY.DIRECT_PURCHASE]: { name: '指定购买', emoji: '🛒', color: '#f59e0b' },
+  [SOURCE_CATEGORY.EVENT_REWARD]: { name: '活动获得', emoji: '🎊', color: '#22c55e' }
+}
+
 export const SOURCE_CONFIG = {
   [SOURCE_TYPES.COLLAGE]: {
     name: '拼装',
     emoji: '🎨',
-    color: '#e94560'
+    color: '#e94560',
+    category: SOURCE_CATEGORY.RANDOM_DROP
   },
   [SOURCE_TYPES.EXPEDITION]: {
     name: '探险',
     emoji: '🗺️',
-    color: '#3b82f6'
+    color: '#3b82f6',
+    category: SOURCE_CATEGORY.RANDOM_DROP
   },
   [SOURCE_TYPES.MARKET]: {
     name: '市场',
     emoji: '🏪',
-    color: '#f59e0b'
+    color: '#f59e0b',
+    category: SOURCE_CATEGORY.DIRECT_PURCHASE
   },
   [SOURCE_TYPES.EXCHANGE]: {
     name: '交换',
     emoji: '🔄',
-    color: '#06b6d4'
+    color: '#06b6d4',
+    category: SOURCE_CATEGORY.RANDOM_DROP
   },
   [SOURCE_TYPES.GACHA]: {
     name: '盲盒',
     emoji: '🎁',
-    color: '#a855f7'
+    color: '#a855f7',
+    category: SOURCE_CATEGORY.RANDOM_DROP
   },
   [SOURCE_TYPES.SEASON]: {
     name: '赛季',
     emoji: '🏆',
-    color: '#ec4899'
+    color: '#ec4899',
+    category: SOURCE_CATEGORY.EVENT_REWARD
   },
   [SOURCE_TYPES.QUIZ]: {
     name: '问答',
     emoji: '❓',
-    color: '#10b981'
+    color: '#10b981',
+    category: SOURCE_CATEGORY.EVENT_REWARD
   },
   [SOURCE_TYPES.RESEARCH]: {
     name: '研究院',
     emoji: '🔬',
-    color: '#6366f1'
+    color: '#6366f1',
+    category: SOURCE_CATEGORY.EVENT_REWARD
   }
 }
 
@@ -126,16 +146,17 @@ export const useWarehouseStore = defineStore('warehouse', () => {
 
   const generateMockSources = (mineral) => {
     const sources = []
-    const sourceTypes = Object.values(SOURCE_TYPES)
+    const sourceList = Object.values(SOURCE_TYPES)
     const locations = EXPEDITION_LOCATIONS.map(l => ({ id: l.id, name: l.name }))
     const boxTypes = ['basic', 'advanced', 'legendary']
     const boxNames = ['普通盲盒', '高级盲盒', '传说盲盒']
     
     for (let i = 0; i < mineral.count; i++) {
-      const sourceType = sourceTypes[Math.floor(Math.random() * sourceTypes.length)]
+      const source = sourceList[Math.floor(Math.random() * sourceList.length)]
+      const sourceConfig = SOURCE_CONFIG[source]
       let sourceData = {}
       
-      switch (sourceType) {
+      switch (source) {
         case SOURCE_TYPES.EXPEDITION:
           sourceData = { ...locations[Math.floor(Math.random() * locations.length)] }
           break
@@ -183,7 +204,8 @@ export const useWarehouseStore = defineStore('warehouse', () => {
       }
       
       sources.push({
-        source: sourceType,
+        source,
+        sourceType: sourceConfig?.category || SOURCE_CATEGORY.RANDOM_DROP,
         sourceData,
         obtainedAt: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)
       })

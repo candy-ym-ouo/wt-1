@@ -157,6 +157,29 @@
           <span class="title-icon">📦</span>
           来源记录
         </h2>
+        
+        <div class="source-type-stats" v-if="sourceTypeStats.length > 0">
+          <div 
+            v-for="typeStat in sourceTypeStats" 
+            :key="typeStat.type"
+            class="source-type-item"
+          >
+            <div class="source-type-header">
+              <span class="source-type-icon">{{ typeStat.icon }}</span>
+              <div class="source-type-info">
+                <span class="source-type-name" :style="{ color: typeStat.color }">{{ typeStat.name }}</span>
+                <span class="source-type-count">{{ typeStat.count }}次</span>
+              </div>
+            </div>
+            <div class="source-type-bar">
+              <div 
+                class="source-type-fill" 
+                :style="{ width: typeStat.percentage + '%', background: typeStat.color }"
+              ></div>
+            </div>
+          </div>
+        </div>
+        
         <div class="source-stats">
           <div 
             v-for="stat in sourceStats" 
@@ -167,8 +190,9 @@
               <span class="source-stat-icon">{{ stat.icon }}</span>
               <div class="source-stat-info">
                 <span class="source-stat-name">{{ stat.name }}</span>
-                <span class="source-stat-count">{{ stat.count }}次</span>
+                <span class="source-stat-type-tag" :style="{ background: stat.typeColor }">{{ stat.typeName }}</span>
               </div>
+              <span class="source-stat-count">{{ stat.count }}次</span>
             </div>
             <div class="source-stat-bar">
               <div 
@@ -196,6 +220,7 @@
                   <span class="source-name" :style="{ color: src.color }">
                     {{ src.name }}
                   </span>
+                  <span class="source-type-badge" :style="{ background: src.typeColor }">{{ src.typeName }}</span>
                   <span class="source-time">{{ formatRelativeTime(src.obtainedAt) }}</span>
                 </div>
                 <div class="source-detail" v-if="src.detail">
@@ -834,14 +859,47 @@ const sources = computed(() => {
     .sort((a, b) => b.obtainedAt - a.obtainedAt)
     .map(src => {
       const config = gameStore.getSourceConfig(src.source)
+      const typeConfig = gameStore.getSourceTypeConfig(config.type)
       return {
         ...src,
         name: config.name,
         icon: config.icon,
         color: config.color,
+        typeName: typeConfig.name,
+        typeColor: typeConfig.color,
+        typeIcon: typeConfig.icon,
         detail: formatSourceDetail(src.source, src.sourceData)
       }
     })
+})
+
+const sourceTypeStats = computed(() => {
+  if (!collectedData.value?.sources || collectedData.value.sources.length === 0) return []
+  
+  const statMap = {}
+  for (const src of collectedData.value.sources) {
+    const config = gameStore.getSourceConfig(src.source)
+    const type = config.type
+    if (!statMap[type]) {
+      const typeConfig = gameStore.getSourceTypeConfig(type)
+      statMap[type] = {
+        type,
+        name: typeConfig.name,
+        icon: typeConfig.icon,
+        color: typeConfig.color,
+        count: 0
+      }
+    }
+    statMap[type].count++
+  }
+  
+  const total = collectedData.value.sources.length
+  return Object.values(statMap)
+    .sort((a, b) => b.count - a.count)
+    .map(s => ({
+      ...s,
+      percentage: Math.round((s.count / total) * 100)
+    }))
 })
 
 const sourceStats = computed(() => {
@@ -851,11 +909,14 @@ const sourceStats = computed(() => {
   for (const src of collectedData.value.sources) {
     if (!statMap[src.source]) {
       const config = gameStore.getSourceConfig(src.source)
+      const typeConfig = gameStore.getSourceTypeConfig(config.type)
       statMap[src.source] = {
         source: src.source,
         name: config.name,
         icon: config.icon,
         color: config.color,
+        typeName: typeConfig.name,
+        typeColor: typeConfig.color,
         count: 0
       }
     }
@@ -2020,6 +2081,93 @@ onMounted(() => {
   padding: 20px;
 }
 
+.source-type-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.source-type-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.source-type-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.source-type-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.source-type-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.source-type-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.source-type-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.source-type-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.source-type-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.source-type-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: sourceTypeShimmer 2s infinite;
+}
+
+@keyframes sourceTypeShimmer {
+  0% { background-position: -20px 0; }
+  100% { background-position: calc(100% + 20px) 0; }
+}
+
 .source-stats {
   display: flex;
   flex-direction: column;
@@ -2056,14 +2204,23 @@ onMounted(() => {
 .source-stat-info {
   flex: 1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .source-stat-name {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.source-stat-type-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  align-self: flex-start;
 }
 
 .source-stat-count {
@@ -2074,6 +2231,7 @@ onMounted(() => {
   padding: 3px 8px;
   border-radius: 8px;
   font-family: 'Courier New', monospace;
+  flex-shrink: 0;
 }
 
 .source-stat-bar {
@@ -2171,6 +2329,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 4px;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .source-name {
@@ -2178,11 +2337,21 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.source-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
 .source-time {
   font-size: 11px;
   color: var(--text-secondary);
   font-family: 'Courier New', monospace;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .source-detail {

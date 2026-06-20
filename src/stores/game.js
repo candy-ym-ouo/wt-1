@@ -431,20 +431,36 @@ export const useGameStore = defineStore('game', () => {
     }
   })
 
+  const SOURCE_TYPE = {
+    RANDOM_DROP: 'random_drop',
+    DIRECT_PURCHASE: 'direct_purchase',
+    EVENT_REWARD: 'event_reward'
+  }
+
+  const SOURCE_TYPE_CONFIG = {
+    [SOURCE_TYPE.RANDOM_DROP]: { name: '随机掉落', icon: '🎲', color: '#8b5cf6' },
+    [SOURCE_TYPE.DIRECT_PURCHASE]: { name: '指定购买', icon: '🛒', color: '#f59e0b' },
+    [SOURCE_TYPE.EVENT_REWARD]: { name: '活动获得', icon: '🎊', color: '#22c55e' }
+  }
+
   const SOURCE_CONFIG = {
-    collage: { name: '拼装工坊', icon: '🎨', color: '#ec4899' },
-    expedition: { name: '探险发现', icon: '🗺️', color: '#3b82f6' },
-    market: { name: '市场购买', icon: '🏪', color: '#f59e0b' },
-    exchange: { name: '交换站', icon: '🔄', color: '#06b6d4' },
-    gacha: { name: '盲盒抽取', icon: '🎁', color: '#a855f7' },
-    season: { name: '赛季奖励', icon: '🏆', color: '#ef4444' },
-    quiz: { name: '问答解锁', icon: '❓', color: '#22c55e' },
-    research: { name: '研究院', icon: '🔬', color: '#6366f1' },
-    auction: { name: '拍卖竞得', icon: '🎪', color: '#ef4444' }
+    collage: { name: '拼装工坊', icon: '🎨', color: '#ec4899', type: SOURCE_TYPE.RANDOM_DROP },
+    expedition: { name: '探险发现', icon: '🗺️', color: '#3b82f6', type: SOURCE_TYPE.RANDOM_DROP },
+    market: { name: '市场购买', icon: '🏪', color: '#f59e0b', type: SOURCE_TYPE.DIRECT_PURCHASE },
+    exchange: { name: '交换站', icon: '🔄', color: '#06b6d4', type: SOURCE_TYPE.RANDOM_DROP },
+    gacha: { name: '盲盒抽取', icon: '🎁', color: '#a855f7', type: SOURCE_TYPE.RANDOM_DROP },
+    season: { name: '赛季奖励', icon: '🏆', color: '#ef4444', type: SOURCE_TYPE.EVENT_REWARD },
+    quiz: { name: '问答解锁', icon: '❓', color: '#22c55e', type: SOURCE_TYPE.EVENT_REWARD },
+    research: { name: '研究院', icon: '🔬', color: '#6366f1', type: SOURCE_TYPE.EVENT_REWARD },
+    auction: { name: '拍卖竞得', icon: '🎪', color: '#ef4444', type: SOURCE_TYPE.DIRECT_PURCHASE }
   }
 
   const getSourceConfig = (source) => {
-    return SOURCE_CONFIG[source] || { name: source, icon: '📦', color: '#6b7280' }
+    return SOURCE_CONFIG[source] || { name: source, icon: '📦', color: '#6b7280', type: SOURCE_TYPE.RANDOM_DROP }
+  }
+
+  const getSourceTypeConfig = (type) => {
+    return SOURCE_TYPE_CONFIG[type] || { name: '未知来源', icon: '📦', color: '#6b7280' }
   }
 
   const getCoinCategoryConfig = (category) => {
@@ -660,8 +676,10 @@ export const useGameStore = defineStore('game', () => {
   const collectMineral = (mineral, source = 'collage', sourceData = {}, rewards = {}, keyEvents = [], options = {}) => {
     const detectorStore = useDetectorStore()
     
+    const sourceConfig = getSourceConfig(source)
     const sourceRecord = {
       source,
+      sourceType: sourceConfig.type,
       sourceData,
       obtainedAt: Date.now()
     }
@@ -1115,6 +1133,7 @@ export const useGameStore = defineStore('game', () => {
         
         sources.push({
           source,
+          sourceType: SOURCE_CONFIG[source]?.type || SOURCE_TYPE.RANDOM_DROP,
           sourceData,
           obtainedAt: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000)
         })
@@ -1796,7 +1815,10 @@ export const useGameStore = defineStore('game', () => {
     addDiscoveryLog,
     getDiscoveryLogs,
     getDiscoveryLogsByDate,
+    SOURCE_TYPE,
+    SOURCE_TYPE_CONFIG,
     getSourceConfig,
+    getSourceTypeConfig,
     getCoinCategoryConfig,
     addCoinTransaction,
     getCoinTransactions,

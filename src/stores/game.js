@@ -47,6 +47,7 @@ export const useGameStore = defineStore('game', () => {
   const discoveryLogs = ref([])
   const MAX_LOGS = 200
   const collageStartTime = ref(null)
+  const collageSnapshot = ref(null)
 
   const coinTransactions = ref([])
   const MAX_COIN_TRANSACTIONS = 200
@@ -231,6 +232,16 @@ export const useGameStore = defineStore('game', () => {
 
   const canStartExpedition = computed(() => {
     return expeditionPhase.value === 'map' && stamina.value > 0
+  })
+
+  const hasCollageSnapshot = computed(() => collageSnapshot.value !== null)
+
+  const hasActiveCollage = computed(() => currentCollage.value !== null && collagePieces.value.length > 0)
+
+  const collageProgress = computed(() => {
+    if (!collagePieces.value.length) return 0
+    const placed = collagePieces.value.filter(p => p.isPlaced).length
+    return Math.round((placed / collagePieces.value.length) * 100)
   })
 
   const SOURCE_CONFIG = {
@@ -780,9 +791,37 @@ export const useGameStore = defineStore('game', () => {
   }
 
   const resetCurrentCollage = () => {
+    if (currentCollage.value && collagePieces.value.length > 0) {
+      collageSnapshot.value = {
+        mineral: { ...currentCollage.value },
+        pieces: collagePieces.value.map(p => ({ ...p })),
+        startTime: collageStartTime.value
+      }
+    }
     currentCollage.value = null
     collagePieces.value = []
     collageStartTime.value = null
+  }
+
+  const restoreCollageSnapshot = () => {
+    if (!collageSnapshot.value) return null
+    const snapshot = collageSnapshot.value
+    currentCollage.value = snapshot.mineral
+    collagePieces.value = snapshot.pieces.map(p => ({ ...p }))
+    collageStartTime.value = snapshot.startTime
+    collageSnapshot.value = null
+    saveProgress()
+    return { mineral: currentCollage.value, pieces: [...collagePieces.value] }
+  }
+
+  const clearCollageSnapshot = () => {
+    collageSnapshot.value = null
+  }
+
+  const saveCollageDraft = () => {
+    if (currentCollage.value && collagePieces.value.length > 0) {
+      saveProgress()
+    }
   }
 
   const saveProgress = () => {
@@ -800,6 +839,10 @@ export const useGameStore = defineStore('game', () => {
       expeditionHistory: expeditionHistory.value,
       discoveryLogs: discoveryLogs.value,
       coinTransactions: coinTransactions.value,
+      currentCollage: currentCollage.value,
+      collagePieces: collagePieces.value,
+      collageStartTime: collageStartTime.value,
+      collageSnapshot: collageSnapshot.value,
       savedAt: Date.now()
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
@@ -1161,6 +1204,15 @@ export const useGameStore = defineStore('game', () => {
         discoveryLogs.value = progress.discoveryLogs || []
         coinTransactions.value = progress.coinTransactions || []
         
+        if (progress.currentCollage && progress.collagePieces && progress.collagePieces.length > 0) {
+          currentCollage.value = progress.currentCollage
+          collagePieces.value = progress.collagePieces
+          collageStartTime.value = progress.collageStartTime || null
+        }
+        if (progress.collageSnapshot) {
+          collageSnapshot.value = progress.collageSnapshot
+        }
+        
         regenStamina()
       } else {
         collectedMinerals.value = generateMockCollectedMinerals()
@@ -1479,6 +1531,7 @@ export const useGameStore = defineStore('game', () => {
     currentCollage,
     collagePieces,
     collageStartTime,
+    collageSnapshot,
     completedCollages,
     coins,
     totalCollages,
@@ -1515,6 +1568,9 @@ export const useGameStore = defineStore('game', () => {
     highestRarityMineral,
     consecutiveCollageDays,
     canStartExpedition,
+    hasCollageSnapshot,
+    hasActiveCollage,
+    collageProgress,
     isMineralCollected,
     collectMineral,
     startNewCollage,
@@ -1526,6 +1582,9 @@ export const useGameStore = defineStore('game', () => {
     isNewlyDiscovered,
     markAsViewed,
     resetCurrentCollage,
+    restoreCollageSnapshot,
+    clearCollageSnapshot,
+    saveCollageDraft,
     saveProgress,
     loadProgress,
     resetProgress,

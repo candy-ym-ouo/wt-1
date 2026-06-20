@@ -39,10 +39,11 @@ import { RARITY_CONFIG } from '@/data/rarity'
 
 const props = defineProps({
   mineral: Object,
-  pieces: Array
+  pieces: Array,
+  autoStart: Boolean
 })
 
-const emit = defineEmits(['complete'])
+const emit = defineEmits(['complete', 'piece-update'])
 
 const containerRef = ref(null)
 const canvasRef = ref(null)
@@ -208,8 +209,8 @@ const createPieces = () => {
     container.addChild(sprite)
     container.addChild(highlight)
 
-    container.x = piece.startX + offsetX
-    container.y = piece.startY + offsetY
+    container.x = (piece.currentX && !piece.isPlaced) ? piece.currentX : piece.startX + offsetX
+    container.y = (piece.currentY && !piece.isPlaced) ? piece.currentY : piece.startY + offsetY
     container.rotation = piece.rotation * Math.PI / 180
     container.pivot.set(0, 0)
     container.eventMode = 'static'
@@ -309,6 +310,7 @@ const onDragEnd = () => {
     draggedPiece.cursor = 'grab'
     draggedPiece.scale.set(1)
     audioStore.playError()
+    emit('piece-update', { pieceId: piece.id, currentX: draggedPiece.x, currentY: draggedPiece.y })
   }
 
   draggedPiece = null
@@ -456,6 +458,9 @@ watch(() => props.pieces, () => {
 onMounted(() => {
   nextTick(() => {
     initPixiApp()
+    if (props.autoStart && props.pieces?.some(p => p.isPlaced)) {
+      gameStarted.value = true
+    }
   })
 
   const handleResize = () => {

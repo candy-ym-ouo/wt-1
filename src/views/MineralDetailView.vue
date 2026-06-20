@@ -456,6 +456,48 @@
             上架拍卖
           </button>
         </div>
+        <div v-if="mineralCount > 1" class="exchange-preview-card">
+          <div class="preview-header">
+            <span class="preview-title">💱 兑换收益预估</span>
+            <span class="preview-subtitle">多余 {{ duplicateCount }} 份</span>
+          </div>
+          <div class="preview-grid">
+            <div class="preview-item">
+              <span class="p-icon">{{ TOKEN_EMOJI }}</span>
+              <div class="p-info">
+                <span class="p-label">{{ TOKEN_NAME }}</span>
+                <span class="p-value token-val">+{{ exchangePreview.tokens }}</span>
+              </div>
+            </div>
+            <div class="preview-item">
+              <span class="p-icon">🪙</span>
+              <div class="p-info">
+                <span class="p-label">金币</span>
+                <span class="p-value coin-val">+{{ exchangePreview.coins }}</span>
+              </div>
+            </div>
+            <div class="preview-item">
+              <span class="p-icon">🎁</span>
+              <div class="p-info">
+                <span class="p-label">道具</span>
+                <span class="p-value item-val">
+                  {{ exchangePreview.expectedItems ? '约' + exchangePreview.expectedItems + '个' : '—' }}
+                </span>
+              </div>
+            </div>
+            <div class="preview-item">
+              <span class="p-icon">💸</span>
+              <div class="p-info">
+                <span class="p-label">手续费</span>
+                <span class="p-value tax-val">-{{ exchangePreview.tax }} {{ TOKEN_EMOJI }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="exchangePreview.itemExample" class="preview-hint">
+            🎲 可能获得: {{ exchangePreview.itemExample.emoji }} {{ exchangePreview.itemExample.name }} 等
+          </div>
+        </div>
+
         <button
           v-if="mineralCount > 1"
           class="btn btn-large exchange-entry-btn"
@@ -470,7 +512,7 @@
           @click="openBatchExchange"
         >
           <span class="btn-icon">♻️</span>
-          批量兑换 (多余 {{ mineralCount - 1 }} 份)
+          立即批量兑换 (多余 {{ mineralCount - 1 }} 份)
         </button>
       </div>
     </div>
@@ -512,11 +554,20 @@ import { useMarketStore } from '@/stores/market'
 import { useMuseumStore } from '@/stores/museum'
 import { useResearchStore } from '@/stores/research'
 import { useDetectorStore } from '@/stores/detector'
+import { useExchangeStore } from '@/stores/exchange'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
 import { getMineralById } from '@/data/minerals'
 import { SEASONS } from '@/data/season'
 import { getHallsByMineralId } from '@/data/halls'
 import { CATEGORY_CONFIG } from '@/data/research'
+import {
+  TOKEN_NAME,
+  TOKEN_EMOJI,
+  EXCHANGE_TAX_RATE,
+  COIN_CONVERSION_RATE,
+  getExchangePointValue,
+  estimateItemRewards
+} from '@/data/exchange'
 import RatingStars from '@/components/RatingStars.vue'
 import PopularityBadge from '@/components/PopularityBadge.vue'
 import CoinFlowModal from '@/components/CoinFlowModal.vue'
@@ -530,6 +581,7 @@ const marketStore = useMarketStore()
 const museumStore = useMuseumStore()
 const researchStore = useResearchStore()
 const detectorStore = useDetectorStore()
+const exchangeStore = useExchangeStore()
 
 const showCoinFlow = ref(false)
 const showBatchExchange = ref(false)
@@ -820,6 +872,27 @@ const mineralCount = computed(() => {
   if (!mineral.value) return 0
   const m = gameStore.collectedMinerals.find(m => m.id === mineral.value.id)
   return m?.count || 0
+})
+
+const duplicateCount = computed(() => Math.max(0, mineralCount.value - 1))
+
+const exchangePreview = computed(() => {
+  if (!mineral.value || duplicateCount.value <= 0) {
+    return { tokens: 0, coins: 0, tax: 0, expectedItems: 0, itemExample: null }
+  }
+  const pointValue = getExchangePointValue(mineral.value.rarity)
+  const totalBase = pointValue * duplicateCount.value
+  const tokens = Math.round(totalBase * (1 - EXCHANGE_TAX_RATE))
+  const tax = totalBase - tokens
+  const coins = Math.round(tokens * COIN_CONVERSION_RATE)
+  const est = estimateItemRewards(mineral.value, duplicateCount.value)
+  return {
+    tokens,
+    coins,
+    tax,
+    expectedItems: est?.expectedCount || 0,
+    itemExample: est?.example || null
+  }
 })
 
 const mineralDiscoveryLogs = computed(() => {
@@ -1243,6 +1316,88 @@ onMounted(() => {
   box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
   color: #000;
   font-weight: 700;
+}
+
+.exchange-preview-card {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(167, 139, 250, 0.06));
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.preview-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.preview-subtitle {
+  font-size: 12px;
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.p-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.p-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.p-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.1;
+}
+
+.p-value {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: 'Courier New', monospace;
+  line-height: 1.2;
+}
+
+.p-value.token-val { color: #60a5fa; }
+.p-value.coin-val { color: #fbbf24; }
+.p-value.item-val { color: #a78bfa; }
+.p-value.tax-val { color: #f87171; font-size: 13px; }
+
+.preview-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  text-align: center;
 }
 
 .locked-content,

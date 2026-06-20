@@ -18,16 +18,20 @@
 
             <div class="batch-summary-bar">
               <div class="summary-item">
-                <span class="summary-label">可选矿物</span>
-                <span class="summary-value">{{ duplicateMinerals.length }} 种</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">已选</span>
+                <span class="summary-label">已选矿物</span>
                 <span class="summary-value selected">{{ selectedIds.length }} 种</span>
               </div>
               <div class="summary-item">
-                <span class="summary-label">预估收益</span>
-                <span class="summary-value coins">{{ totalEstimatedCoins }} 🪙</span>
+                <span class="summary-label">{{ TOKEN_NAME }}</span>
+                <span class="summary-value tokens">{{ TOKEN_EMOJI }} {{ totalEstimatedTokens }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">金币</span>
+                <span class="summary-value coins">+{{ totalEstimatedCoins }} 🪙</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">道具</span>
+                <span class="summary-value items">📦 约{{ totalEstimatedItems }}</span>
               </div>
             </div>
 
@@ -70,8 +74,11 @@
                   <span class="count-value">×{{ mineral.duplicateCount }}</span>
                 </div>
                 <div class="row-value">
+                  <span class="value-tokens">{{ TOKEN_EMOJI }}+{{ mineral.exchangeValue }}</span>
                   <span class="value-coins">+{{ mineral.coinValue }} 🪙</span>
-                  <span class="value-points">+{{ mineral.exchangeValue }} 积分</span>
+                  <span v-if="mineral.itemEstimate" class="value-items">
+                    🎁约{{ mineral.itemEstimate.expectedCount }}个
+                  </span>
                 </div>
               </div>
             </div>
@@ -98,32 +105,47 @@
             </div>
 
             <div class="result-stats">
-              <div class="result-stat-item points-stat">
-                <span class="stat-icon">🔄</span>
+              <div class="result-stat-item tokens-stat">
+                <span class="stat-icon">{{ TOKEN_EMOJI }}</span>
                 <div class="stat-content">
-                  <span class="stat-value">+{{ batchResult.totalPointsGained }}</span>
-                  <span class="stat-label">积分</span>
+                  <span class="stat-value">+{{ batchResult.tokensGained }}</span>
+                  <span class="stat-label">{{ TOKEN_NAME }}</span>
                 </div>
               </div>
               <div class="result-stat-item coins-stat">
                 <span class="stat-icon">🪙</span>
                 <div class="stat-content">
                   <span class="stat-value">+{{ batchResult.totalCoinsGained }}</span>
-                  <span class="stat-label">金币</span>
+                  <span class="stat-label">金币{{ batchResult.coinFromItems ? `(含道具+${batchResult.coinFromItems})` : '' }}</span>
                 </div>
               </div>
               <div class="result-stat-item count-stat">
                 <span class="stat-icon">📦</span>
                 <div class="stat-content">
-                  <span class="stat-value">{{ batchResult.exchangedMineralCount }} 种</span>
-                  <span class="stat-label">已兑换矿物</span>
+                  <span class="stat-value">{{ batchResult.totalExchangeCount }} 份</span>
+                  <span class="stat-label">{{ batchResult.exchangedMineralCount }} 种矿物</span>
                 </div>
               </div>
               <div class="result-stat-item tax-stat">
                 <span class="stat-icon">💸</span>
                 <div class="stat-content">
                   <span class="stat-value">-{{ batchResult.totalTaxPaid }}</span>
-                  <span class="stat-label">手续费</span>
+                  <span class="stat-label">{{ TOKEN_NAME }}手续费</span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="batchResult.items && batchResult.items.length > 0" class="result-items">
+              <h3 class="items-title">🎁 获得道具</h3>
+              <div class="items-grid">
+                <div
+                  v-for="item in batchResult.items"
+                  :key="item.id"
+                  :class="['item-card', `item-rarity-${item.rarity}`]"
+                >
+                  <span class="item-emoji">{{ item.emoji }}</span>
+                  <span class="item-name">{{ item.name }}</span>
+                  <span class="item-count">×{{ item.count || 1 }}</span>
                 </div>
               </div>
             </div>
@@ -139,7 +161,9 @@
                   <span class="detail-emoji">{{ item.emoji }}</span>
                   <span class="detail-name">{{ item.name }}</span>
                   <span class="detail-count">×{{ item.count }}</span>
-                  <span class="detail-coins">+{{ item.coinsGained }} 🪙</span>
+                  <span class="detail-reward">
+                    {{ TOKEN_EMOJI }}+{{ item.tokensGained }} · 🪙+{{ item.coinsGained }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -166,7 +190,14 @@ import { useExchangeStore } from '@/stores/exchange'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { RARITY_CONFIG } from '@/data/rarity'
-import { EXCHANGE_TAX_RATE, getExchangePointValue } from '@/data/exchange'
+import {
+  EXCHANGE_TAX_RATE,
+  COIN_CONVERSION_RATE,
+  TOKEN_NAME,
+  TOKEN_EMOJI,
+  getExchangePointValue,
+  estimateItemRewards
+} from '@/data/exchange'
 
 const props = defineProps({
   visible: Boolean,
@@ -196,12 +227,14 @@ const duplicateMinerals = computed(() => {
       const pointValue = getExchangePointValue(m.rarity)
       const totalBase = pointValue * duplicateCount
       const afterTax = Math.round(totalBase * (1 - EXCHANGE_TAX_RATE))
-      const coinValue = Math.round(afterTax * 0.5)
+      const coinValue = Math.round(afterTax * COIN_CONVERSION_RATE)
+      const itemEstimate = estimateItemRewards(m, duplicateCount)
       return {
         ...m,
         duplicateCount,
         exchangeValue: afterTax,
-        coinValue
+        coinValue,
+        itemEstimate
       }
     })
     .sort((a, b) => {
@@ -210,10 +243,23 @@ const duplicateMinerals = computed(() => {
     })
 })
 
+const totalEstimatedTokens = computed(() => {
+  return duplicateMinerals.value
+    .filter(m => selectedIds.value.includes(m.id))
+    .reduce((sum, m) => sum + m.exchangeValue, 0)
+})
+
 const totalEstimatedCoins = computed(() => {
   return duplicateMinerals.value
     .filter(m => selectedIds.value.includes(m.id))
     .reduce((sum, m) => sum + m.coinValue, 0)
+})
+
+const totalEstimatedItems = computed(() => {
+  const total = duplicateMinerals.value
+    .filter(m => selectedIds.value.includes(m.id))
+    .reduce((sum, m) => sum + (m.itemEstimate ? m.itemEstimate.expectedCount : 0), 0)
+  return Math.round(total * 10) / 10
 })
 
 const isSelected = (id) => selectedIds.value.includes(id)
@@ -407,6 +453,14 @@ watch(() => props.visible, (val) => {
   color: #fbbf24;
 }
 
+.summary-value.tokens {
+  color: #60a5fa;
+}
+
+.summary-value.items {
+  color: #a78bfa;
+}
+
 .batch-actions-top {
   display: flex;
   gap: 8px;
@@ -533,6 +587,7 @@ watch(() => props.visible, (val) => {
 .row-value {
   flex-shrink: 0;
   text-align: right;
+  min-width: 110px;
 }
 
 .value-coins {
@@ -540,6 +595,20 @@ watch(() => props.visible, (val) => {
   font-size: 13px;
   font-weight: 700;
   color: #fbbf24;
+}
+
+.value-tokens {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #60a5fa;
+}
+
+.value-items {
+  display: block;
+  font-size: 10px;
+  color: #a78bfa;
+  margin-top: 1px;
 }
 
 .value-points {
@@ -650,6 +719,15 @@ watch(() => props.visible, (val) => {
   color: #0ea5e9;
 }
 
+.tokens-stat {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(59, 130, 246, 0.08));
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.tokens-stat .stat-value {
+  color: #60a5fa;
+}
+
 .coins-stat {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.06));
   border: 1px solid rgba(245, 158, 11, 0.25);
@@ -689,6 +767,62 @@ watch(() => props.visible, (val) => {
   margin: 0 0 10px 0;
 }
 
+.result-items {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.items-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
+}
+
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.item-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.item-rarity-common { border-color: rgba(156, 163, 175, 0.3); }
+.item-rarity-uncommon { border-color: rgba(34, 197, 94, 0.3); }
+.item-rarity-rare { border-color: rgba(59, 130, 246, 0.3); }
+.item-rarity-epic { border-color: rgba(168, 85, 247, 0.3); }
+.item-rarity-legendary { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); }
+
+.item-emoji {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.item-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
 .details-list {
   max-height: 140px;
   overflow-y: auto;
@@ -721,8 +855,8 @@ watch(() => props.visible, (val) => {
   color: var(--text-secondary);
 }
 
-.detail-coins {
-  font-size: 13px;
+.detail-reward {
+  font-size: 12px;
   font-weight: 700;
   color: #fbbf24;
   flex-shrink: 0;

@@ -67,6 +67,30 @@
         </div>
       </div>
 
+      <div class="exchange-balance-bar">
+        <div class="balance-item token-balance">
+          <span class="balance-icon">{{ exchangeStore.tokenInfo.emoji }}</span>
+          <div class="balance-content">
+            <span class="balance-label">{{ exchangeStore.tokenInfo.name }}</span>
+            <span class="balance-value">{{ exchangeStore.tokenInfo.balance }}</span>
+          </div>
+        </div>
+        <div class="balance-item items-balance">
+          <span class="balance-icon">🎒</span>
+          <div class="balance-content">
+            <span class="balance-label">道具库存</span>
+            <span class="balance-value">{{ exchangeStore.inventoryItems.reduce((s, i) => s + i.count, 0) }} 件</span>
+          </div>
+        </div>
+        <div class="balance-item duplicate-balance">
+          <span class="balance-icon">♻️</span>
+          <div class="balance-content">
+            <span class="balance-label">可兑换矿物</span>
+            <span class="balance-value">{{ totalDuplicateValue }} 价值</span>
+          </div>
+        </div>
+      </div>
+
       <div class="search-section">
         <div class="search-box" :class="{ focused: showQuickJump }">
           <span class="search-icon">🔍</span>
@@ -669,6 +693,7 @@ import { useSeasonStore } from '@/stores/season'
 import { useDetectorStore } from '@/stores/detector'
 import { useResearchStore } from '@/stores/research'
 import { useMuseumStore } from '@/stores/museum'
+import { useExchangeStore } from '@/stores/exchange'
 import { RARITY_CONFIG, RARITY } from '@/data/rarity'
 import { 
   MINERALS, 
@@ -694,6 +719,7 @@ const seasonStore = useSeasonStore()
 const detectorStore = useDetectorStore()
 const researchStore = useResearchStore()
 const museumStore = useMuseumStore()
+const exchangeStore = useExchangeStore()
 
 const activeTab = ref('collection')
 const toastMessage = ref('')
@@ -1104,6 +1130,10 @@ const duplicateMineralCount = computed(() => {
   return gameStore.collectedMinerals.filter(m => m.count > 1).length
 })
 
+const totalDuplicateValue = computed(() => {
+  return exchangeStore.totalDuplicateValue || 0
+})
+
 const openBatchExchange = () => {
   audioStore.playClick()
   showBatchExchange.value = true
@@ -1220,6 +1250,75 @@ const openBatchExchange = () => {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(59, 130, 246, 0.08)) !important;
   border-color: rgba(168, 85, 247, 0.25) !important;
 }
+
+.knowledge-progress-card .progress-value.purple {
+  color: #a855f7 !important;
+}
+
+.knowledge-progress-card .progress-fill {
+  background: linear-gradient(90deg, #a855f7, #6366f1);
+}
+
+.exchange-balance-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.balance-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.balance-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.balance-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.balance-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.balance-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  line-height: 1.2;
+}
+
+.token-balance {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.12), rgba(59, 130, 246, 0.06));
+  border-color: rgba(96, 165, 250, 0.2);
+}
+.token-balance .balance-value { color: #60a5fa; }
+
+.items-balance {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.12), rgba(139, 92, 246, 0.06));
+  border-color: rgba(167, 139, 250, 0.2);
+}
+.items-balance .balance-value { color: #a78bfa; }
+
+.duplicate-balance {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.06));
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.duplicate-balance .balance-value { color: #f59e0b; }
 
 .progress-value.purple {
   color: #c084fc !important;
@@ -2361,6 +2460,17 @@ const openBatchExchange = () => {
 }
 
 @media (max-width: 480px) {
+  .exchange-balance-bar {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .balance-item {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .balance-icon { font-size: 24px; }
+  .balance-value { font-size: 16px; }
+  
   .filter-section {
     flex-direction: column;
     align-items: stretch;

@@ -27,16 +27,36 @@
             </div>
           </div>
 
-          <div class="rewards" v-if="!isNew">
-            <div class="reward-item">
-              <span class="reward-icon">🪙</span>
-              <span class="reward-text">+10 金币</span>
+          <div class="rewards" v-if="!isNew && exchangeReward">
+            <div class="reward-grid">
+              <div class="reward-item">
+                <span class="reward-icon">🪙</span>
+                <span class="reward-text">收集奖励 +10</span>
+              </div>
+              <div class="reward-item exchange-item">
+                <span class="reward-icon">{{ TOKEN_EMOJI }}</span>
+                <span class="reward-text">可换 {{ TOKEN_NAME }} +{{ exchangeReward.tokens }}</span>
+              </div>
+              <div class="reward-item exchange-item">
+                <span class="reward-icon">🪙</span>
+                <span class="reward-text">可换金币 +{{ exchangeReward.coins }}</span>
+              </div>
+              <div v-if="exchangeReward.expectedItems > 0" class="reward-item exchange-item gift-item">
+                <span class="reward-icon">🎁</span>
+                <span class="reward-text">
+                  道具约 {{ exchangeReward.expectedItems }}个
+                  <span v-if="exchangeReward.itemExample">(如{{ exchangeReward.itemExample.emoji }})</span>
+                </span>
+              </div>
             </div>
           </div>
 
           <div class="duplicate-hint" v-if="!isNew && duplicateCount > 0">
             <span class="hint-icon">♻️</span>
-            <span class="hint-text">已有多余 {{ duplicateCount }} 份，可批量兑换换取更多金币</span>
+            <span class="hint-text">
+              已有多余 <strong>{{ duplicateCount }}</strong> 份 · 
+              批量兑换可额外获得代币+金币+随机道具
+            </span>
           </div>
 
           <div class="mineral-formula">
@@ -72,6 +92,14 @@ import { useRouter } from 'vue-router'
 import { RARITY_CONFIG, getRarityStars, RARITY } from '@/data/rarity'
 import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
+import {
+  TOKEN_NAME,
+  TOKEN_EMOJI,
+  COIN_CONVERSION_RATE,
+  EXCHANGE_TAX_RATE,
+  getExchangePointValue,
+  estimateItemRewards
+} from '@/data/exchange'
 
 const props = defineProps({
   show: Boolean,
@@ -101,6 +129,23 @@ const duplicateCount = computed(() => {
   if (!props.mineral || props.isNew) return 0
   const collected = gameStore.collectedMinerals.find(m => m.id === props.mineral.id)
   return collected ? collected.count - 1 : 0
+})
+
+const exchangeReward = computed(() => {
+  if (!props.mineral || duplicateCount.value <= 0) return null
+  const count = duplicateCount.value
+  const pointValue = getExchangePointValue(props.mineral.rarity)
+  const totalBase = pointValue * count
+  const tokens = Math.round(totalBase * (1 - EXCHANGE_TAX_RATE))
+  const coins = Math.round(tokens * COIN_CONVERSION_RATE)
+  const est = estimateItemRewards(props.mineral, count)
+  return {
+    count,
+    tokens,
+    coins,
+    expectedItems: est?.expectedCount || 0,
+    itemExample: est?.example || null
+  }
 })
 
 const getSparkleStyle = (index) => {
@@ -310,24 +355,79 @@ const handleBatchExchange = () => {
   margin-bottom: 20px;
 }
 
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
 .reward-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 6px;
+  padding: 8px 10px;
   background: rgba(245, 158, 11, 0.2);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+.reward-item.exchange-item {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.reward-item.gift-item {
+  grid-column: span 2;
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.25);
+  justify-content: center;
+}
+
 .reward-icon {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .reward-text {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
   color: #fbbf24;
+  line-height: 1.3;
+}
+
+.reward-item.exchange-item .reward-text {
+  color: #93c5fd;
+}
+
+.reward-item.gift-item .reward-text {
+  color: #c4b5fd;
+}
+
+.duplicate-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: rgba(245, 158, 11, 0.12);
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.duplicate-hint .hint-icon {
+  font-size: 18px;
+}
+
+.duplicate-hint .hint-text {
+  font-size: 12px;
+  color: #fbbf24;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.duplicate-hint .hint-text strong {
+  color: #f59e0b;
+  font-size: 13px;
 }
 
 .mineral-formula {

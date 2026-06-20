@@ -7,12 +7,16 @@ import {
   EXCHANGE_POINT_VALUES,
   RARITY_CONVERSION,
   EXCHANGE_TAX_RATE,
+  COIN_CONVERSION_RATE,
   MAX_EXCHANGE_HISTORY,
   RISK_WARNINGS,
+  TOKEN_NAME,
+  TOKEN_EMOJI,
   getExchangePointValue,
   getConversionConfig,
   calculateExchangeValue,
-  calculateRarityUpgradeCost
+  calculateRarityUpgradeCost,
+  calculateBatchItems
 } from '@/data/exchange'
 
 const STORAGE_KEY = 'mineral_exchange_data'
@@ -23,6 +27,56 @@ export const useExchangeStore = defineStore('exchange', () => {
   const exchangeHistory = ref([])
   const exchangePoints = ref(0)
   const activeTab = ref('duplicate')
+  const inventory = ref([])
+
+  const tokenInfo = computed(() => ({
+    name: TOKEN_NAME,
+    emoji: TOKEN_EMOJI,
+    balance: exchangePoints.value
+  }))
+
+  const inventoryItems = computed(() => {
+    const merged = {}
+    for (const item of inventory.value) {
+      if (!merged[item.id]) {
+        merged[item.id] = { ...item, count: 1 }
+      } else {
+        merged[item.id].count += 1
+      }
+    }
+    return Object.values(merged).sort((a, b) => {
+      const o = ['legendary', 'epic', 'rare', 'uncommon', 'common']
+      return o.indexOf(a.rarity) - o.indexOf(b.rarity)
+    })
+  })
+
+  const addItemToInventory = (item) => {
+    inventory.value.push({ ...item, obtainedAt: Date.now() })
+  }
+
+  const addItemsToInventory = (items) => {
+    for (const item of items) {
+      for (let i = 0; i < (item.count || 1); i++) {
+        addItemToInventory(item)
+      }
+    }
+  }
+
+  const getItemCount = (itemId) => {
+    return inventory.value.filter(i => i.id === itemId).length
+  }
+
+  const consumeItem = (itemId, count = 1) => {
+    let remaining = count
+    inventory.value = inventory.value.filter(item => {
+      if (item.id === itemId && remaining > 0) {
+        remaining -= 1
+        return false
+      }
+      return true
+    })
+    return remaining === 0
+  }
 
   const duplicateMinerals = computed(() => {
     return gameStore.collectedMinerals
@@ -148,18 +202,35 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
 
     exchangePoints.value += afterTax
-    const coinBonus = Math.round(afterTax * 0.5)
+    const coinBonus = Math.round(afterTax * COIN_CONVERSION_RATE)
     gameStore.coins += coinBonus
-    
-    gameStore.addCoinTransaction('exchange_bonus', coinBonus, `置换 ${mineral.name} x${exchangeCount} 奖励`, {
+
+    const items = calculateBatchItems(mineral, exchangeCount)
+    let extraCoinsFromItems = 0
+    if (items.length > 0) {
+      for (const it of items) {
+        if (it.bonusCoins) {
+          extraCoinsFromItems += it.bonusCoins * (it.count || 1)
+        }
+      }
+      gameStore.coins += extraCoinsFromItems
+      addItemsToInventory(items)
+    }
+
+    const totalCoins = coinBonus + extraCoinsFromItems
+
+    gameStore.addCoinTransaction('exchange_bonus', totalCoins, `置换 ${mineral.name} x${exchangeCount} 奖励`, {
       mineralId,
       mineralName: mineral.name,
       mineralEmoji: mineral.emoji,
       rarity: mineral.rarity,
       exchangeType: 'duplicate',
       count: exchangeCount,
-      pointsGained: afterTax,
-      taxPaid: taxAmount
+      tokensGained: afterTax,
+      taxPaid: taxAmount,
+      coinBonus,
+      extraCoinsFromItems,
+      items: items.map(i => ({ id: i.id, name: i.name, count: i.count || 1 }))
     })
 
     const record = {
@@ -170,8 +241,12 @@ export const useExchangeStore = defineStore('exchange', () => {
       mineralEmoji: mineral.emoji,
       rarity: mineral.rarity,
       count: exchangeCount,
+      tokensGained: afterTax,
       pointsGained: afterTax,
       coinsGained: coinBonus,
+      extraCoinsFromItems,
+      totalCoins,
+      items,
       taxPaid: taxAmount,
       timestamp: Date.now()
     }
@@ -180,14 +255,18 @@ export const useExchangeStore = defineStore('exchange', () => {
       exchangeHistory.value = exchangeHistory.value.slice(0, MAX_EXCHANGE_HISTORY)
     }
 
-    gameStore.emitTaskEvent('coinsEarned', coinBonus)
+    gameStore.emitTaskEvent('coinsEarned', totalCoins)
     gameStore.saveProgress()
     saveExchangeData()
 
     return {
       success: true,
+      tokensGained: afterTax,
       pointsGained: afterTax,
       coinsGained: coinBonus,
+      extraCoinsFromItems,
+      totalCoins,
+      items,
       taxPaid: taxAmount,
       exchangeCount
     }
@@ -317,9 +396,12 @@ export const useExchangeStore = defineStore('exchange', () => {
 
     let totalPointsGained = 0
     let totalCoinsGained = 0
+    let totalExtraCoins = 0
     let totalTaxPaid = 0
     let totalExchangeCount = 0
     const exchangedDetails = []
+    const allItems = []
+    const itemsMap = {}
 
     for (const mineral of toExchange) {
       const exchangeCount = mineral.count - 1
@@ -333,22 +415,41 @@ export const useExchangeStore = defineStore('exchange', () => {
       mineral.count = 1
 
       exchangePoints.value += afterTax
-      const coinBonus = Math.round(afterTax * 0.5)
+      const coinBonus = Math.round(afterTax * COIN_CONVERSION_RATE)
       gameStore.coins += coinBonus
 
-      gameStore.addCoinTransaction('exchange_bonus', coinBonus, `批量置换 ${mineral.name} x${exchangeCount}`, {
+      const items = calculateBatchItems(mineral, exchangeCount)
+      let extraCoins = 0
+      if (items.length > 0) {
+        for (const it of items) {
+          if (it.bonusCoins) extraCoins += it.bonusCoins * (it.count || 1)
+          if (!itemsMap[it.id]) {
+            itemsMap[it.id] = { ...it, count: it.count || 1 }
+          } else {
+            itemsMap[it.id].count += it.count || 1
+          }
+        }
+        gameStore.coins += extraCoins
+        addItemsToInventory(items)
+      }
+
+      gameStore.addCoinTransaction('exchange_bonus', coinBonus + extraCoins, `批量置换 ${mineral.name} x${exchangeCount}`, {
         mineralId: mineral.id,
         mineralName: mineral.name,
         mineralEmoji: mineral.emoji,
         rarity: mineral.rarity,
         exchangeType: 'batch_duplicate',
         count: exchangeCount,
-        pointsGained: afterTax,
-        taxPaid: taxAmount
+        tokensGained: afterTax,
+        taxPaid: taxAmount,
+        coinBonus,
+        extraCoins,
+        items: items.map(i => ({ id: i.id, name: i.name, count: i.count || 1 }))
       })
 
       totalPointsGained += afterTax
       totalCoinsGained += coinBonus
+      totalExtraCoins += extraCoins
       totalTaxPaid += taxAmount
       totalExchangeCount += exchangeCount
 
@@ -358,18 +459,27 @@ export const useExchangeStore = defineStore('exchange', () => {
         emoji: mineral.emoji,
         rarity: mineral.rarity,
         count: exchangeCount,
+        tokensGained: afterTax,
         pointsGained: afterTax,
-        coinsGained: coinBonus
+        coinsGained: coinBonus,
+        extraCoins,
+        items
       })
     }
+
+    const mergedItems = Object.values(itemsMap)
 
     const record = {
       id: Date.now(),
       type: 'batch_duplicate',
       count: totalExchangeCount,
       mineralCount: exchangedDetails.length,
+      tokensGained: totalPointsGained,
       pointsGained: totalPointsGained,
       coinsGained: totalCoinsGained,
+      extraCoinsFromItems: totalExtraCoins,
+      totalCoins: totalCoinsGained + totalExtraCoins,
+      items: mergedItems,
       taxPaid: totalTaxPaid,
       details: exchangedDetails,
       timestamp: Date.now()
@@ -379,18 +489,22 @@ export const useExchangeStore = defineStore('exchange', () => {
       exchangeHistory.value = exchangeHistory.value.slice(0, MAX_EXCHANGE_HISTORY)
     }
 
-    gameStore.emitTaskEvent('coinsEarned', totalCoinsGained)
+    gameStore.emitTaskEvent('coinsEarned', totalCoinsGained + totalExtraCoins)
     gameStore.saveProgress()
     saveExchangeData()
 
     return {
       success: true,
+      tokensGained: totalPointsGained,
       totalPointsGained,
-      totalCoinsGained,
+      totalCoinsGained: totalCoinsGained + totalExtraCoins,
+      coinBase: totalCoinsGained,
+      coinFromItems: totalExtraCoins,
       totalTaxPaid,
       totalExchangeCount,
       exchangedDetails,
-      exchangedMineralCount: exchangedDetails.length
+      exchangedMineralCount: exchangedDetails.length,
+      items: mergedItems
     }
   }
 
@@ -402,6 +516,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     const data = {
       exchangeHistory: exchangeHistory.value,
       exchangePoints: exchangePoints.value,
+      inventory: inventory.value,
       savedAt: Date.now()
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
@@ -414,6 +529,7 @@ export const useExchangeStore = defineStore('exchange', () => {
         const data = JSON.parse(saved)
         exchangeHistory.value = data.exchangeHistory || []
         exchangePoints.value = data.exchangePoints || 0
+        inventory.value = data.inventory || []
       }
     } catch (e) {
       console.error('Failed to load exchange data:', e)
@@ -423,6 +539,7 @@ export const useExchangeStore = defineStore('exchange', () => {
   const resetExchangeData = () => {
     exchangeHistory.value = []
     exchangePoints.value = 0
+    inventory.value = []
     localStorage.removeItem(STORAGE_KEY)
   }
 
@@ -430,6 +547,9 @@ export const useExchangeStore = defineStore('exchange', () => {
     exchangeHistory,
     exchangePoints,
     activeTab,
+    inventory,
+    inventoryItems,
+    tokenInfo,
     duplicateMinerals,
     totalDuplicateValue,
     conversionOptions,
@@ -437,6 +557,10 @@ export const useExchangeStore = defineStore('exchange', () => {
     exchangeDuplicate,
     exchangeRarityConversion,
     batchExchangeAll,
+    addItemToInventory,
+    addItemsToInventory,
+    getItemCount,
+    consumeItem,
     setActiveTab,
     saveExchangeData,
     loadExchangeData,

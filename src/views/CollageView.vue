@@ -64,6 +64,14 @@
           <span class="btn-icon">♻️</span>
           批量兑换重复矿物 ({{ duplicateMineralCount }})
         </button>
+        <div v-if="duplicateMineralCount > 0" class="exchange-balance-chip">
+          <span class="balance-chip-item">
+            {{ exchangeStore.tokenInfo.emoji }} {{ TOKEN_NAME }} {{ exchangeStore.tokenInfo.balance }}
+          </span>
+          <span class="balance-chip-item">
+            🎒 {{ totalItemCount }}件道具
+          </span>
+        </div>
       </div>
     </div>
 
@@ -254,6 +262,7 @@ import { useGameStore } from '@/stores/game'
 import { useAudioStore } from '@/stores/audio'
 import { useExchangeStore } from '@/stores/exchange'
 import { RARITY_CONFIG, getRarityStars } from '@/data/rarity'
+import { TOKEN_NAME } from '@/data/exchange'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -316,6 +325,10 @@ const affordableCount = computed(() => {
 
 const duplicateMineralCount = computed(() => {
   return gameStore.collectedMinerals.filter(m => m.count > 1).length
+})
+
+const totalItemCount = computed(() => {
+  return exchangeStore.inventoryItems.reduce((s, i) => s + (i.count || 0), 0)
 })
 
 const filteredMinerals = computed(() => {
@@ -781,6 +794,36 @@ onBeforeUnmount(() => {
 .batch-exchange-entry:hover {
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.15));
   border-color: rgba(245, 158, 11, 0.5);
+}
+
+.exchange-balance-chip {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.balance-chip-item {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.balance-chip-item:first-child {
+  color: #93c5fd;
+  border-color: rgba(96, 165, 250, 0.2);
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.balance-chip-item:last-child {
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.2);
+  background: rgba(167, 139, 250, 0.08);
 }
 
 .btn-large {

@@ -79,6 +79,7 @@ export const useGameStore = defineStore('game', () => {
     [DATA_CATEGORY.COLLAGE]: 'default',
     [DATA_CATEGORY.COLLECTION]: 'default'
   })
+  const isLoading = ref(false)
   const collectedMinerals = ref([])
   const currentCollage = ref(null)
   const collagePieces = ref([])
@@ -1094,6 +1095,8 @@ export const useGameStore = defineStore('game', () => {
   }
 
   const saveProgress = () => {
+    if (isLoading.value) return
+
     const progress = {
       collectedMinerals: collectedMinerals.value,
       completedCollages: completedCollages.value,
@@ -1117,23 +1120,37 @@ export const useGameStore = defineStore('game', () => {
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
 
+    const slotDataMap = {}
+
     for (const category of Object.values(DATA_CATEGORY)) {
       const slotId = slotCategoryBindings.value[category]
-      if (slotId) {
-        const categoryData = collectCategoryData(category)
+      if (!slotId) continue
+
+      if (!slotDataMap[slotId]) {
         const slotKey = getSlotStorageKey(slotId)
         try {
-          const existingData = JSON.parse(localStorage.getItem(slotKey) || '{}')
-          const mergedData = { ...existingData, ...categoryData }
-          localStorage.setItem(slotKey, JSON.stringify(mergedData))
-          
-          const slot = saveSlots.value.find(s => s.id === slotId)
-          if (slot) {
-            slot.updatedAt = Date.now()
-          }
+          slotDataMap[slotId] = JSON.parse(localStorage.getItem(slotKey) || '{}')
         } catch (e) {
-          console.error(`Failed to save category ${category} to slot ${slotId}:`, e)
+          slotDataMap[slotId] = {}
         }
+      }
+
+      const categoryData = collectCategoryData(category)
+      Object.assign(slotDataMap[slotId], categoryData)
+    }
+
+    for (const [slotId, slotData] of Object.entries(slotDataMap)) {
+      const slotKey = getSlotStorageKey(slotId)
+      slotData.savedAt = Date.now()
+      try {
+        localStorage.setItem(slotKey, JSON.stringify(slotData))
+        const slot = saveSlots.value.find(s => s.id === slotId)
+        if (slot) {
+          slot.updatedAt = Date.now()
+          slot.snapshot = getSlotSnapshot(slotData)
+        }
+      } catch (e) {
+        console.error(`Failed to save slot ${slotId}:`, e)
       }
     }
     persistSlots()
@@ -1479,6 +1496,7 @@ export const useGameStore = defineStore('game', () => {
 
   const loadProgress = () => {
     try {
+      isLoading.value = true
       initializeSlots()
       
       const hasLegacySave = localStorage.getItem(STORAGE_KEY) !== null
@@ -1525,6 +1543,7 @@ export const useGameStore = defineStore('game', () => {
             collageSnapshot.value = progress.collageSnapshot
           }
           
+          isLoading.value = false
           saveProgress()
         } else {
           collectedMinerals.value = generateMockCollectedMinerals()
@@ -1533,13 +1552,16 @@ export const useGameStore = defineStore('game', () => {
           newlyDiscoveredMinerals.value = []
           coins.value = 5000
           totalCollages.value = 20
+          isLoading.value = false
           saveProgress()
         }
       }
       
+      isLoading.value = false
       regenStamina()
     } catch (e) {
       console.error('Failed to load progress:', e)
+      isLoading.value = false
       collectedMinerals.value = generateMockCollectedMinerals()
       discoveryLogs.value = generateMockDiscoveryLogs()
       coinTransactions.value = generateMockCoinTransactions()
@@ -2120,36 +2142,66 @@ export const useGameStore = defineStore('game', () => {
     const slot = saveSlots.value.find(s => s.id === slotId)
     if (!slot) return false
     
-    saveToSlot(activeSlotId.value)
+    saveProgress()
     
     activeSlotId.value = slotId
     localStorage.setItem(ACTIVE_SLOT_KEY, slotId)
     
-    for (const category of Object.keys(DATA_CATEGORY)) {
-      slotCategoryBindings.value[category] = slotId
+    isLoading.value = true
+    try {
+      for (const category of Object.values(DATA_CATEGORY)) {
+        const boundSlotId = slotCategoryBindings.value[category]
+        if (boundSlotId) {
+          loadFromSlot(boundSlotId, [category])
+        }
+      }
+    } finally {
+      isLoading.value = false
     }
-    persistBindings()
     
-    return loadFromSlot(slotId)
+    return true
   }
 
   const bindCategoryToSlot = (category, slotId) => {
-    if (!DATA_CATEGORY[category.toUpperCase()]) return false
+    const categoryKey = category.toUpperCase()
+    if (!DATA_CATEGORY[categoryKey]) return false
     const slot = saveSlots.value.find(s => s.id === slotId)
     if (!slot) return false
 
-    const currentData = collectCategoryData(category)
-    const currentSlotKey = getSlotStorageKey(slotCategoryBindings.value[category])
-    const currentSlotData = JSON.parse(localStorage.getItem(currentSlotKey) || '{}')
-    for (const [key, value] of Object.entries(currentData)) {
-      currentSlotData[key] = value
-    }
-    localStorage.setItem(currentSlotKey, JSON.stringify(currentSlotData))
+    saveProgress()
 
     slotCategoryBindings.value[category] = slotId
     persistBindings()
 
-    return loadFromSlot(slotId, [category])
+    isLoading.value = true
+    try {
+      const success = loadFromSlot(slotId, [category])
+      return success
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const bindAllCategoriesToSlot = (slotId) => {
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    if (!slot) return false
+
+    saveProgress()
+
+    for (const category of Object.values(DATA_CATEGORY)) {
+      slotCategoryBindings.value[category] = slotId
+    }
+    persistBindings()
+
+    activeSlotId.value = slotId
+    localStorage.setItem(ACTIVE_SLOT_KEY, slotId)
+
+    isLoading.value = true
+    try {
+      return loadFromSlot(slotId)
+    } finally {
+      isLoading.value = false
+    }
   }
 
   const duplicateSlot = (slotId, newName, newIcon = '💾') => {
@@ -2458,6 +2510,7 @@ export const useGameStore = defineStore('game', () => {
     loadFromSlot,
     switchActiveSlot,
     bindCategoryToSlot,
+    bindAllCategoriesToSlot,
     duplicateSlot,
     exportSlotData,
     importSlotData,
@@ -2466,6 +2519,7 @@ export const useGameStore = defineStore('game', () => {
     getSlotInfo,
     loadAllSlotInfos,
     migrateLegacySave,
-    initializeSlots
+    initializeSlots,
+    isLoading
   }
 })

@@ -111,8 +111,17 @@
                       v-if="slot.id !== gameStore.activeSlotId"
                       class="btn btn-small btn-switch"
                       @click="handleSwitchSlot(slot.id)"
+                      title="仅切换活动存档（保留独立数据绑定）"
                     >
-                      🔄 切换至此
+                      🔄 切换
+                    </button>
+                    <button 
+                      v-if="slot.id !== gameStore.activeSlotId"
+                      class="btn btn-small btn-bind-all"
+                      @click="handleBindAllToSlot(slot.id)"
+                      title="将所有数据绑定到此存档（覆盖独立绑定）"
+                    >
+                      ⚡ 全绑定
                     </button>
                     <button 
                       v-else
@@ -558,19 +567,47 @@ const handleSwitchSlot = (slotId) => {
   
   confirmDialog.value = {
     icon: '🔄',
-    title: '切换存档',
-    message: `确定要切换到存档「${slot.name}」吗？当前进度将自动保存。`,
+    title: '切换活动存档',
+    message: `确定要切换活动存档为「${slot.name}」吗？\n\n✅ 此操作将保留您的独立数据绑定设置\n✅ 各数据类别仍从各自绑定的存档加载\n✅ 当前进度将自动保存`,
     confirmText: '切换',
     danger: false,
     action: () => {
       const success = gameStore.switchActiveSlot(slotId)
       if (success) {
-        showToast(`已切换到「${slot.name}」`, true)
+        showToast(`活动存档已切换为「${slot.name}」`, true)
         audioStore.playSuccess?.()
         refreshSlotInfos()
         emit('slot-changed', slotId)
       } else {
         showToast('切换失败', false)
+        audioStore.playError()
+      }
+    }
+  }
+  showConfirmDialog.value = true
+}
+
+const handleBindAllToSlot = (slotId) => {
+  audioStore.playClick()
+  const slot = slotInfos.value.find(s => s.id === slotId)
+  if (!slot) return
+  
+  confirmDialog.value = {
+    icon: '⚡',
+    title: '全部绑定到此存档',
+    message: `确定要将首页、拼装、图鉴所有数据都绑定到存档「${slot.name}」吗？\n\n⚠️  此操作将覆盖现有的独立数据绑定\n⚠️  所有数据都将从此存档加载并保存\n✅ 当前进度将自动保存`,
+    confirmText: '确认全绑定',
+    danger: true,
+    action: () => {
+      const success = gameStore.bindAllCategoriesToSlot(slotId)
+      if (success) {
+        showToast(`所有数据已绑定到「${slot.name}」`, true)
+        audioStore.playSuccess?.()
+        refreshSlotInfos()
+        emit('slot-changed', slotId)
+        emit('binding-changed', null)
+      } else {
+        showToast('操作失败', false)
         audioStore.playError()
       }
     }
@@ -1017,6 +1054,12 @@ const confirmAction = () => {
 
 .btn-switch {
   background: linear-gradient(135deg, #e94560, #ff6b6b);
+  color: white;
+  border: none;
+}
+
+.btn-bind-all {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
   color: white;
   border: none;
 }

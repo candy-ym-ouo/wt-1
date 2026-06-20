@@ -36,6 +36,13 @@
           </div>
           <button 
             class="sound-btn" 
+            @click="openSaveSlotManager"
+            title="存档管理"
+          >
+            💾
+          </button>
+          <button 
+            class="sound-btn" 
             @click="openAudioSettings"
             :class="{ active: soundEnabled }"
             :title="soundEnabled ? '音效设置' : '音效已关闭'"
@@ -87,6 +94,13 @@
     <CoinFlowModal 
       :visible="showCoinFlow" 
       @close="closeCoinFlow" 
+    />
+
+    <SaveSlotManager
+      :visible="showSaveSlotManager"
+      @close="closeSaveSlotManager"
+      @slot-changed="handleSlotChanged"
+      @binding-changed="handleBindingChanged"
     />
 
     <Teleport to="body">
@@ -317,6 +331,7 @@ import { useAuctionStore } from './stores/auction'
 import SeasonSettlementModal from './components/SeasonSettlementModal.vue'
 import CoinFlowModal from './components/CoinFlowModal.vue'
 import FirstDiscoveryCelebration from './components/FirstDiscoveryCelebration.vue'
+import SaveSlotManager from './components/SaveSlotManager.vue'
 import { useRouter } from 'vue-router'
 import { MINERALS } from './data/minerals'
 import { SEASONS } from './data/season'
@@ -337,6 +352,7 @@ const auctionStore = useAuctionStore()
 
 const showCoinFlow = ref(false)
 const showAudioSettings = ref(false)
+const showSaveSlotManager = ref(false)
 
 const openCoinFlow = () => {
   audioStore.playClick()
@@ -357,8 +373,25 @@ const closeAudioSettings = () => {
   showAudioSettings.value = false
 }
 
+const openSaveSlotManager = () => {
+  audioStore.playClick()
+  showSaveSlotManager.value = true
+}
+
+const closeSaveSlotManager = () => {
+  showSaveSlotManager.value = false
+}
+
 const handleToggleMusic = () => {
   audioStore.toggleMusic()
+}
+
+const handleSlotChanged = (slotId) => {
+  console.log('Slot changed to:', slotId)
+}
+
+const handleBindingChanged = (binding) => {
+  console.log('Binding changed:', binding)
 }
 
 const sceneCategoryList = computed(() => {

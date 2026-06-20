@@ -13,8 +13,72 @@ import { SEASONS } from '@/data/season'
 import { useDetectorStore } from './detector'
 
 const STORAGE_KEY = 'mineral_collage_progress'
+const SLOTS_KEY = 'mineral_collage_slots'
+const ACTIVE_SLOT_KEY = 'mineral_collage_active_slot'
+
+const DATA_CATEGORY = {
+  HOME: 'home',
+  COLLAGE: 'collage',
+  COLLECTION: 'collection'
+}
+
+const DATA_CATEGORY_CONFIG = {
+  [DATA_CATEGORY.HOME]: {
+    name: '首页数据',
+    icon: '🏛️',
+    description: '金币、体力、探险等级、交易记录等'
+  },
+  [DATA_CATEGORY.COLLAGE]: {
+    name: '拼装数据',
+    icon: '🎨',
+    description: '当前拼装、拼装碎片、拼装历史等'
+  },
+  [DATA_CATEGORY.COLLECTION]: {
+    name: '图鉴数据',
+    icon: '📖',
+    description: '已收集矿物、发现日志等'
+  }
+}
+
+const getCategoryFields = (category) => {
+  const fields = {
+    [DATA_CATEGORY.HOME]: [
+      'coins',
+      'stamina',
+      'maxStamina',
+      'staminaRegenRate',
+      'lastStaminaRegen',
+      'expeditionLevel',
+      'expeditionExp',
+      'expToNextLevel',
+      'expeditionHistory',
+      'coinTransactions',
+      'newlyDiscoveredMinerals'
+    ],
+    [DATA_CATEGORY.COLLAGE]: [
+      'currentCollage',
+      'collagePieces',
+      'collageStartTime',
+      'collageSnapshot',
+      'completedCollages',
+      'totalCollages'
+    ],
+    [DATA_CATEGORY.COLLECTION]: [
+      'collectedMinerals',
+      'discoveryLogs'
+    ]
+  }
+  return fields[category] || []
+}
 
 export const useGameStore = defineStore('game', () => {
+  const saveSlots = ref([])
+  const activeSlotId = ref('default')
+  const slotCategoryBindings = ref({
+    [DATA_CATEGORY.HOME]: 'default',
+    [DATA_CATEGORY.COLLAGE]: 'default',
+    [DATA_CATEGORY.COLLECTION]: 'default'
+  })
   const collectedMinerals = ref([])
   const currentCollage = ref(null)
   const collagePieces = ref([])
@@ -1048,9 +1112,31 @@ export const useGameStore = defineStore('game', () => {
       collagePieces: collagePieces.value,
       collageStartTime: collageStartTime.value,
       collageSnapshot: collageSnapshot.value,
+      newlyDiscoveredMinerals: newlyDiscoveredMinerals.value,
       savedAt: Date.now()
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress))
+
+    for (const category of Object.values(DATA_CATEGORY)) {
+      const slotId = slotCategoryBindings.value[category]
+      if (slotId) {
+        const categoryData = collectCategoryData(category)
+        const slotKey = getSlotStorageKey(slotId)
+        try {
+          const existingData = JSON.parse(localStorage.getItem(slotKey) || '{}')
+          const mergedData = { ...existingData, ...categoryData }
+          localStorage.setItem(slotKey, JSON.stringify(mergedData))
+          
+          const slot = saveSlots.value.find(s => s.id === slotId)
+          if (slot) {
+            slot.updatedAt = Date.now()
+          }
+        } catch (e) {
+          console.error(`Failed to save category ${category} to slot ${slotId}:`, e)
+        }
+      }
+    }
+    persistSlots()
   }
 
   const generateMockCollectedMinerals = () => {
@@ -1393,46 +1479,71 @@ export const useGameStore = defineStore('game', () => {
 
   const loadProgress = () => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const progress = JSON.parse(saved)
-        collectedMinerals.value = progress.collectedMinerals || []
-        completedCollages.value = progress.completedCollages || []
-        coins.value = progress.coins ?? 100
-        totalCollages.value = progress.totalCollages || 0
-        stamina.value = progress.stamina ?? 100
-        maxStamina.value = progress.maxStamina ?? 100
-        expeditionLevel.value = progress.expeditionLevel ?? 1
-        expeditionExp.value = progress.expeditionExp ?? 0
-        expToNextLevel.value = progress.expToNextLevel ?? 100
-        lastStaminaRegen.value = progress.lastStaminaRegen || Date.now()
-        expeditionHistory.value = progress.expeditionHistory || []
-        discoveryLogs.value = progress.discoveryLogs || []
-        coinTransactions.value = progress.coinTransactions || []
-        
-        if (progress.currentCollage && progress.collagePieces && progress.collagePieces.length > 0) {
-          currentCollage.value = progress.currentCollage
-          collagePieces.value = progress.collagePieces
-          collageStartTime.value = progress.collageStartTime || null
-        }
-        if (progress.collageSnapshot) {
-          collageSnapshot.value = progress.collageSnapshot
-        }
-        
-        regenStamina()
-      } else {
-        collectedMinerals.value = generateMockCollectedMinerals()
-        discoveryLogs.value = generateMockDiscoveryLogs()
-        coinTransactions.value = generateMockCoinTransactions()
-        coins.value = 5000
-        totalCollages.value = 20
-        saveProgress()
+      initializeSlots()
+      
+      const hasLegacySave = localStorage.getItem(STORAGE_KEY) !== null
+      const hasSlotSave = localStorage.getItem(getSlotStorageKey('default')) !== null
+      
+      if (hasLegacySave && !hasSlotSave) {
+        migrateLegacySave()
       }
+      
+      let loadedFromSlots = false
+      for (const category of Object.values(DATA_CATEGORY)) {
+        const slotId = slotCategoryBindings.value[category]
+        if (slotId) {
+          const success = loadFromSlot(slotId, [category])
+          if (success) loadedFromSlots = true
+        }
+      }
+      
+      if (!loadedFromSlots) {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) {
+          const progress = JSON.parse(saved)
+          collectedMinerals.value = progress.collectedMinerals || []
+          completedCollages.value = progress.completedCollages || []
+          coins.value = progress.coins ?? 100
+          totalCollages.value = progress.totalCollages || 0
+          stamina.value = progress.stamina ?? 100
+          maxStamina.value = progress.maxStamina ?? 100
+          expeditionLevel.value = progress.expeditionLevel ?? 1
+          expeditionExp.value = progress.expeditionExp ?? 0
+          expToNextLevel.value = progress.expToNextLevel ?? 100
+          lastStaminaRegen.value = progress.lastStaminaRegen || Date.now()
+          expeditionHistory.value = progress.expeditionHistory || []
+          discoveryLogs.value = progress.discoveryLogs || []
+          coinTransactions.value = progress.coinTransactions || []
+          newlyDiscoveredMinerals.value = progress.newlyDiscoveredMinerals || []
+          
+          if (progress.currentCollage && progress.collagePieces && progress.collagePieces.length > 0) {
+            currentCollage.value = progress.currentCollage
+            collagePieces.value = progress.collagePieces
+            collageStartTime.value = progress.collageStartTime || null
+          }
+          if (progress.collageSnapshot) {
+            collageSnapshot.value = progress.collageSnapshot
+          }
+          
+          saveProgress()
+        } else {
+          collectedMinerals.value = generateMockCollectedMinerals()
+          discoveryLogs.value = generateMockDiscoveryLogs()
+          coinTransactions.value = generateMockCoinTransactions()
+          newlyDiscoveredMinerals.value = []
+          coins.value = 5000
+          totalCollages.value = 20
+          saveProgress()
+        }
+      }
+      
+      regenStamina()
     } catch (e) {
       console.error('Failed to load progress:', e)
       collectedMinerals.value = generateMockCollectedMinerals()
       discoveryLogs.value = generateMockDiscoveryLogs()
       coinTransactions.value = generateMockCoinTransactions()
+      newlyDiscoveredMinerals.value = []
       coins.value = 5000
     }
   }
@@ -1732,7 +1843,518 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  const getSlotStorageKey = (slotId) => `${STORAGE_KEY}_${slotId}`
+
+  const getAllFields = () => [
+    ...getCategoryFields(DATA_CATEGORY.HOME),
+    ...getCategoryFields(DATA_CATEGORY.COLLAGE),
+    ...getCategoryFields(DATA_CATEGORY.COLLECTION),
+    'showNewMineralModal',
+    'newMineral',
+    'isNewMineral',
+    'showFirstDiscoveryCelebration',
+    'firstDiscoveryMineral',
+    'firstDiscoveryRewards',
+    'currentExpedition',
+    'expeditionPhase',
+    'currentEvent',
+    'eventResult',
+    'expeditionRewards',
+    'showRewardModal',
+    'savedAt'
+  ]
+
+  const collectDataByFields = (fields) => {
+    const data = {}
+    const allRefs = {
+      collectedMinerals,
+      currentCollage,
+      collagePieces,
+      completedCollages,
+      coins,
+      totalCollages,
+      showNewMineralModal,
+      newMineral,
+      isNewMineral,
+      showFirstDiscoveryCelebration,
+      firstDiscoveryMineral,
+      firstDiscoveryRewards,
+      newlyDiscoveredMinerals,
+      stamina,
+      maxStamina,
+      staminaRegenRate,
+      lastStaminaRegen,
+      expeditionLevel,
+      expeditionExp,
+      expToNextLevel,
+      currentExpedition,
+      expeditionPhase,
+      currentEvent,
+      eventResult,
+      expeditionRewards,
+      showRewardModal,
+      expeditionHistory,
+      discoveryLogs,
+      coinTransactions,
+      collageStartTime,
+      collageSnapshot
+    }
+    
+    for (const field of fields) {
+      if (allRefs[field]) {
+        data[field] = allRefs[field].value
+      }
+    }
+    data.savedAt = Date.now()
+    return data
+  }
+
+  const collectAllData = () => {
+    return collectDataByFields(getAllFields())
+  }
+
+  const collectCategoryData = (category) => {
+    const fields = getCategoryFields(category)
+    return collectDataByFields(fields)
+  }
+
+  const applyDataToState = (data) => {
+    const fieldToRef = {
+      collectedMinerals,
+      currentCollage,
+      collagePieces,
+      completedCollages,
+      coins,
+      totalCollages,
+      showNewMineralModal,
+      newMineral,
+      isNewMineral,
+      showFirstDiscoveryCelebration,
+      firstDiscoveryMineral,
+      firstDiscoveryRewards,
+      newlyDiscoveredMinerals,
+      stamina,
+      maxStamina,
+      staminaRegenRate,
+      lastStaminaRegen,
+      expeditionLevel,
+      expeditionExp,
+      expToNextLevel,
+      currentExpedition,
+      expeditionPhase,
+      currentEvent,
+      eventResult,
+      expeditionRewards,
+      showRewardModal,
+      expeditionHistory,
+      discoveryLogs,
+      coinTransactions,
+      collageStartTime,
+      collageSnapshot
+    }
+
+    for (const [key, value] of Object.entries(data)) {
+      if (fieldToRef[key] && fieldToRef[key].value !== undefined) {
+        fieldToRef[key].value = value
+      }
+    }
+  }
+
+  const initializeSlots = () => {
+    try {
+      const savedSlots = localStorage.getItem(SLOTS_KEY)
+      if (savedSlots) {
+        saveSlots.value = JSON.parse(savedSlots)
+      } else {
+        saveSlots.value = [{
+          id: 'default',
+          name: '默认存档',
+          icon: '💾',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          description: '初始默认存档位'
+        }]
+        persistSlots()
+      }
+
+      const activeSlot = localStorage.getItem(ACTIVE_SLOT_KEY)
+      if (activeSlot) {
+        activeSlotId.value = activeSlot
+      }
+
+      const savedBindings = localStorage.getItem(`${STORAGE_KEY}_bindings`)
+      if (savedBindings) {
+        slotCategoryBindings.value = JSON.parse(savedBindings)
+      }
+    } catch (e) {
+      console.error('Failed to initialize slots:', e)
+    }
+  }
+
+  const persistSlots = () => {
+    localStorage.setItem(SLOTS_KEY, JSON.stringify(saveSlots.value))
+  }
+
+  const persistBindings = () => {
+    localStorage.setItem(`${STORAGE_KEY}_bindings`, JSON.stringify(slotCategoryBindings.value))
+  }
+
+  const createSlot = (name, icon = '💾', description = '') => {
+    const slotId = `slot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const newSlot = {
+      id: slotId,
+      name,
+      icon,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      description
+    }
+    saveSlots.value.push(newSlot)
+    persistSlots()
+    return newSlot
+  }
+
+  const updateSlot = (slotId, updates) => {
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    if (slot) {
+      Object.assign(slot, updates, { updatedAt: Date.now() })
+      persistSlots()
+      return true
+    }
+    return false
+  }
+
+  const deleteSlot = (slotId) => {
+    if (slotId === 'default') return false
+    const index = saveSlots.value.findIndex(s => s.id === slotId)
+    if (index > -1) {
+      saveSlots.value.splice(index, 1)
+      localStorage.removeItem(getSlotStorageKey(slotId))
+      
+      for (const category of Object.keys(slotCategoryBindings.value)) {
+        if (slotCategoryBindings.value[category] === slotId) {
+          slotCategoryBindings.value[category] = 'default'
+        }
+      }
+      if (activeSlotId.value === slotId) {
+        activeSlotId.value = 'default'
+      }
+      
+      persistSlots()
+      persistBindings()
+      localStorage.setItem(ACTIVE_SLOT_KEY, activeSlotId.value)
+      return true
+    }
+    return false
+  }
+
+  const saveToSlot = (slotId, categories = null) => {
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    if (!slot) return false
+
+    let dataToSave = {}
+    if (categories && categories.length > 0) {
+      for (const category of categories) {
+        dataToSave = { ...dataToSave, ...collectCategoryData(category) }
+      }
+    } else {
+      dataToSave = collectAllData()
+    }
+
+    try {
+      const existingData = JSON.parse(localStorage.getItem(getSlotStorageKey(slotId)) || '{}')
+      const mergedData = { ...existingData, ...dataToSave }
+      localStorage.setItem(getSlotStorageKey(slotId), JSON.stringify(mergedData))
+      
+      slot.updatedAt = Date.now()
+      if (!categories || categories.length === Object.keys(DATA_CATEGORY).length) {
+        slot.snapshot = getSlotSnapshot(mergedData)
+      }
+      persistSlots()
+      return true
+    } catch (e) {
+      console.error('Failed to save to slot:', e)
+      return false
+    }
+  }
+
+  const getSlotSnapshot = (data) => {
+    return {
+      collectedCount: data.collectedMinerals?.length || 0,
+      coins: data.coins || 0,
+      completedCollages: data.completedCollages?.length || 0,
+      expeditionLevel: data.expeditionLevel || 1
+    }
+  }
+
+  const loadFromSlot = (slotId, categories = null) => {
+    try {
+      const saved = localStorage.getItem(getSlotStorageKey(slotId))
+      if (!saved) return false
+
+      const data = JSON.parse(saved)
+      
+      if (categories && categories.length > 0) {
+        const filteredData = {}
+        for (const category of categories) {
+          const fields = getCategoryFields(category)
+          for (const field of fields) {
+            if (data[field] !== undefined) {
+              filteredData[field] = data[field]
+            }
+          }
+        }
+        applyDataToState(filteredData)
+      } else {
+        applyDataToState(data)
+      }
+      
+      return true
+    } catch (e) {
+      console.error('Failed to load from slot:', e)
+      return false
+    }
+  }
+
+  const switchActiveSlot = (slotId) => {
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    if (!slot) return false
+    
+    saveToSlot(activeSlotId.value)
+    
+    activeSlotId.value = slotId
+    localStorage.setItem(ACTIVE_SLOT_KEY, slotId)
+    
+    for (const category of Object.keys(DATA_CATEGORY)) {
+      slotCategoryBindings.value[category] = slotId
+    }
+    persistBindings()
+    
+    return loadFromSlot(slotId)
+  }
+
+  const bindCategoryToSlot = (category, slotId) => {
+    if (!DATA_CATEGORY[category.toUpperCase()]) return false
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    if (!slot) return false
+
+    const currentData = collectCategoryData(category)
+    const currentSlotKey = getSlotStorageKey(slotCategoryBindings.value[category])
+    const currentSlotData = JSON.parse(localStorage.getItem(currentSlotKey) || '{}')
+    for (const [key, value] of Object.entries(currentData)) {
+      currentSlotData[key] = value
+    }
+    localStorage.setItem(currentSlotKey, JSON.stringify(currentSlotData))
+
+    slotCategoryBindings.value[category] = slotId
+    persistBindings()
+
+    return loadFromSlot(slotId, [category])
+  }
+
+  const duplicateSlot = (slotId, newName, newIcon = '💾') => {
+    const sourceSlot = saveSlots.value.find(s => s.id === slotId)
+    if (!sourceSlot) return null
+
+    const sourceData = localStorage.getItem(getSlotStorageKey(slotId))
+    if (!sourceData) return null
+
+    const newSlot = createSlot(newName, newIcon, `${sourceSlot.name} 的副本`)
+    localStorage.setItem(getSlotStorageKey(newSlot.id), sourceData)
+    
+    if (sourceSlot.snapshot) {
+      newSlot.snapshot = { ...sourceSlot.snapshot }
+      persistSlots()
+    }
+    
+    return newSlot
+  }
+
+  const exportSlotData = (slotId, categories = null) => {
+    try {
+      const saved = localStorage.getItem(getSlotStorageKey(slotId))
+      if (!saved) return null
+
+      let data = JSON.parse(saved)
+      if (categories && categories.length > 0) {
+        const filteredData = {}
+        for (const category of categories) {
+          const fields = getCategoryFields(category)
+          for (const field of fields) {
+            if (data[field] !== undefined) {
+              filteredData[field] = data[field]
+            }
+          }
+        }
+        data = filteredData
+      }
+
+      const slot = saveSlots.value.find(s => s.id === slotId)
+      const exportData = {
+        version: '1.0.0',
+        exportedAt: Date.now(),
+        slotName: slot?.name || 'Unknown',
+        categories: categories || Object.values(DATA_CATEGORY),
+        data
+      }
+
+      return JSON.stringify(exportData, null, 2)
+    } catch (e) {
+      console.error('Failed to export slot data:', e)
+      return null
+    }
+  }
+
+  const importSlotData = (jsonString, targetSlotId = null, merge = false) => {
+    try {
+      const importData = JSON.parse(jsonString)
+      
+      if (!importData.data || !importData.version) {
+        return { success: false, message: '无效的存档文件格式' }
+      }
+
+      let slotId = targetSlotId
+      if (!slotId) {
+        const newSlot = createSlot(
+          importData.slotName || `导入的存档 ${new Date().toLocaleString()}`,
+          '📥',
+          `导入于 ${new Date().toLocaleString()}`
+        )
+        slotId = newSlot.id
+      }
+
+      const targetSlot = saveSlots.value.find(s => s.id === slotId)
+      if (!targetSlot) {
+        return { success: false, message: '目标存档不存在' }
+      }
+
+      if (merge) {
+        const existingData = JSON.parse(localStorage.getItem(getSlotStorageKey(slotId)) || '{}')
+        const mergedData = { ...existingData, ...importData.data }
+        localStorage.setItem(getSlotStorageKey(slotId), JSON.stringify(mergedData))
+      } else {
+        localStorage.setItem(getSlotStorageKey(slotId), JSON.stringify(importData.data))
+      }
+
+      targetSlot.updatedAt = Date.now()
+      targetSlot.snapshot = getSlotSnapshot(importData.data)
+      persistSlots()
+
+      return { 
+        success: true, 
+        message: '导入成功', 
+        slotId,
+        categories: importData.categories 
+      }
+    } catch (e) {
+      console.error('Failed to import slot data:', e)
+      return { success: false, message: '导入失败：' + e.message }
+    }
+  }
+
+  const downloadExport = (slotId, categories = null) => {
+    const jsonData = exportSlotData(slotId, categories)
+    if (!jsonData) return false
+
+    const blob = new Blob([jsonData], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    a.href = url
+    a.download = `mineral_save_${slot?.name || slotId}_${timestamp}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    return true
+  }
+
+  const triggerFileImport = (targetSlotId = null, merge = false) => {
+    return new Promise((resolve) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = '.json,application/json'
+      input.onchange = (e) => {
+        const file = e.target.files[0]
+        if (!file) {
+          resolve({ success: false, message: '未选择文件' })
+          return
+        }
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          const result = importSlotData(event.target.result, targetSlotId, merge)
+          resolve(result)
+        }
+        reader.onerror = () => {
+          resolve({ success: false, message: '文件读取失败' })
+        }
+        reader.readAsText(file)
+      }
+      input.click()
+    })
+  }
+
+  const getSlotInfo = (slotId) => {
+    const slot = saveSlots.value.find(s => s.id === slotId)
+    if (!slot) return null
+
+    try {
+      const saved = localStorage.getItem(getSlotStorageKey(slotId))
+      const data = saved ? JSON.parse(saved) : {}
+      return {
+        ...slot,
+        snapshot: slot.snapshot || getSlotSnapshot(data),
+        dataSize: saved ? new Blob([saved]).size : 0,
+        categories: detectCategoriesInData(data)
+      }
+    } catch {
+      return { ...slot, snapshot: null, dataSize: 0, categories: [] }
+    }
+  }
+
+  const detectCategoriesInData = (data) => {
+    const categories = []
+    for (const category of Object.values(DATA_CATEGORY)) {
+      const fields = getCategoryFields(category)
+      const hasData = fields.some(field => data[field] !== undefined)
+      if (hasData) categories.push(category)
+    }
+    return categories
+  }
+
+  const loadAllSlotInfos = () => {
+    return saveSlots.value.map(slot => getSlotInfo(slot.id))
+  }
+
+  const migrateLegacySave = () => {
+    const legacySaved = localStorage.getItem(STORAGE_KEY)
+    if (!legacySaved) return false
+
+    try {
+      const legacyData = JSON.parse(legacySaved)
+      localStorage.setItem(getSlotStorageKey('default'), JSON.stringify(legacyData))
+      
+      const defaultSlot = saveSlots.value.find(s => s.id === 'default')
+      if (defaultSlot) {
+        defaultSlot.snapshot = getSlotSnapshot(legacyData)
+        defaultSlot.updatedAt = legacyData.savedAt || Date.now()
+        persistSlots()
+      }
+      
+      return true
+    } catch (e) {
+      console.error('Failed to migrate legacy save:', e)
+      return false
+    }
+  }
+
   return {
+    saveSlots,
+    activeSlotId,
+    slotCategoryBindings,
+    DATA_CATEGORY,
+    DATA_CATEGORY_CONFIG,
     collectedMinerals,
     currentCollage,
     collagePieces,
@@ -1828,6 +2450,22 @@ export const useGameStore = defineStore('game', () => {
     cancelExpedition,
     getLocation,
     onTaskEvent,
-    emitTaskEvent
+    emitTaskEvent,
+    createSlot,
+    updateSlot,
+    deleteSlot,
+    saveToSlot,
+    loadFromSlot,
+    switchActiveSlot,
+    bindCategoryToSlot,
+    duplicateSlot,
+    exportSlotData,
+    importSlotData,
+    downloadExport,
+    triggerFileImport,
+    getSlotInfo,
+    loadAllSlotInfos,
+    migrateLegacySave,
+    initializeSlots
   }
 })

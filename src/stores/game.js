@@ -407,6 +407,30 @@ export const useGameStore = defineStore('game', () => {
     return Math.round((placed / collagePieces.value.length) * 100)
   })
 
+  const lastCollageReward = computed(() => {
+    if (completedCollages.value.length === 0) return null
+    const last = completedCollages.value[completedCollages.value.length - 1]
+    const rarityConfig = last.mineral ? RARITY_CONFIG[last.mineral.rarity] : null
+    const detectorStore = useDetectorStore()
+    const baseCoins = rarityConfig ? rarityConfig.starCount * 20 : 0
+    const detectorBonus = detectorStore.totalStats?.coinBonus || 0
+    const bonusCoins = last.coins - baseCoins
+
+    return {
+      mineral: last.mineral,
+      completedAt: last.completedAt,
+      timeTaken: last.timeTaken,
+      coins: last.coins,
+      baseCoins,
+      detectorBonus,
+      bonusCoins,
+      exp: last.exp,
+      isNew: last.isNew,
+      events: last.events || [],
+      pieceCount: last.mineral ? rarityConfig?.pieceCount || 0 : 0
+    }
+  })
+
   const SOURCE_CONFIG = {
     collage: { name: '拼装工坊', icon: '🎨', color: '#ec4899' },
     expedition: { name: '探险发现', icon: '🗺️', color: '#3b82f6' },
@@ -1741,6 +1765,7 @@ export const useGameStore = defineStore('game', () => {
     hasCollageSnapshot,
     hasActiveCollage,
     collageProgress,
+    lastCollageReward,
     isMineralCollected,
     collectMineral,
     startNewCollage,

@@ -64,12 +64,77 @@
             <span class="formula-value">{{ mineral?.formula }}</span>
           </div>
 
+          <div class="reward-detail-section" v-if="showRewardDetail && rewardDetail">
+            <div class="reward-detail-header">
+              <span class="detail-title-icon">📋</span>
+              <span class="detail-title">奖励明细</span>
+            </div>
+            <div class="reward-detail-content">
+              <div class="detail-row">
+                <span class="detail-label">⏱️ 拼装用时</span>
+                <span class="detail-value">{{ formatTime(rewardDetail.timeTaken) }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">🧩 碎片数量</span>
+                <span class="detail-value">{{ rewardDetail.pieceCount }} 块</span>
+              </div>
+              <div class="detail-divider"></div>
+              <div class="detail-row coin-row">
+                <span class="detail-label">🪙 基础奖励</span>
+                <span class="detail-value">+{{ rewardDetail.baseCoins }}</span>
+              </div>
+              <div class="detail-row coin-row" v-if="rewardDetail.detectorBonus > 0">
+                <span class="detail-label">🔬 探测器加成 (+{{ rewardDetail.detectorBonus }}%)</span>
+                <span class="detail-value highlight">+{{ rewardDetail.bonusCoins }}</span>
+              </div>
+              <div class="detail-row coin-row total-row">
+                <span class="detail-label">💰 金币总计</span>
+                <span class="detail-value total">+{{ rewardDetail.coins }}</span>
+              </div>
+              <div class="detail-divider"></div>
+              <div class="detail-row exp-row">
+                <span class="detail-label">⭐ 经验值</span>
+                <span class="detail-value">+{{ rewardDetail.exp }} EXP</span>
+              </div>
+              <div class="detail-row" v-if="rewardDetail.isNew">
+                <span class="detail-label">🎉 首次发现</span>
+                <span class="detail-value badge-new">新藏品！</span>
+              </div>
+              <div class="events-tags" v-if="rewardDetail.events.length > 0">
+                <span v-for="(event, idx) in rewardDetail.events" :key="idx" class="event-tag">
+                  {{ event }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            class="btn-toggle-detail" 
+            @click="toggleRewardDetail"
+            v-if="rewardDetail"
+          >
+            <span class="toggle-icon">{{ showRewardDetail ? '▲' : '▼' }}</span>
+            <span>{{ showRewardDetail ? '收起奖励明细' : '查看奖励明细' }}</span>
+          </button>
+
+          <div class="quick-actions">
+            <button class="quick-action-btn continue-btn" @click="handleContinueChallenge">
+              <span class="qa-icon">🎨</span>
+              <span class="qa-label">继续挑战</span>
+            </button>
+            <button class="quick-action-btn atlas-btn" @click="handleGoToCollection">
+              <span class="qa-icon">📖</span>
+              <span class="qa-label">前往图鉴</span>
+            </button>
+            <button class="quick-action-btn detail-btn" @click="handleViewDetail">
+              <span class="qa-icon">🔍</span>
+              <span class="qa-label">查看详情</span>
+            </button>
+          </div>
+
           <div class="modal-actions">
             <button class="btn btn-secondary" @click="handleClose">
-              继续收集
-            </button>
-            <button class="btn" @click="handleViewDetail">
-              查看详情
+              关闭
             </button>
           </div>
           <button
@@ -87,7 +152,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { RARITY_CONFIG, getRarityStars, RARITY } from '@/data/rarity'
 import { useGameStore } from '@/stores/game'
@@ -112,6 +177,14 @@ const emit = defineEmits(['close', 'batchExchange'])
 const router = useRouter()
 const audioStore = useAudioStore()
 const gameStore = useGameStore()
+
+const showRewardDetail = ref(false)
+
+watch(() => props.show, (val) => {
+  if (val) {
+    showRewardDetail.value = false
+  }
+})
 
 const rarityConfig = computed(() => {
   return props.mineral ? RARITY_CONFIG[props.mineral.rarity] : null
@@ -148,6 +221,20 @@ const exchangeReward = computed(() => {
   }
 })
 
+const rewardDetail = computed(() => {
+  const last = gameStore.lastCollageReward
+  if (!last || !props.mineral) return null
+  if (last.mineral?.id !== props.mineral.id) return null
+  return last
+})
+
+const formatTime = (seconds) => {
+  if (seconds < 60) return `${seconds}秒`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}分${secs}秒`
+}
+
 const getSparkleStyle = (index) => {
   const angle = (index / 12) * 360
   const delay = index * 0.1
@@ -155,6 +242,11 @@ const getSparkleStyle = (index) => {
     '--angle': `${angle}deg`,
     '--delay': `${delay}s`
   }
+}
+
+const toggleRewardDetail = () => {
+  audioStore.playClick()
+  showRewardDetail.value = !showRewardDetail.value
 }
 
 const handleClose = () => {
@@ -166,6 +258,23 @@ const handleViewDetail = () => {
   audioStore.playClick()
   emit('close')
   router.push(`/mineral/${props.mineral.id}`)
+}
+
+const handleContinueChallenge = () => {
+  audioStore.playClick()
+  emit('close')
+  setTimeout(() => {
+    const result = gameStore.startNewCollage()
+    if (result) {
+      router.push('/collage')
+    }
+  }, 50)
+}
+
+const handleGoToCollection = () => {
+  audioStore.playClick()
+  emit('close')
+  router.push('/collection')
 }
 
 const handleBatchExchange = () => {
@@ -553,5 +662,240 @@ const handleBatchExchange = () => {
 .modal-leave-to .modal-content {
   opacity: 0;
   transform: scale(0.8);
+}
+
+.reward-detail-section {
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 197, 253, 0.05));
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 14px;
+  overflow: hidden;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reward-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(59, 130, 246, 0.15);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.detail-title-icon {
+  font-size: 16px;
+}
+
+.detail-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.reward-detail-content {
+  padding: 12px 16px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.detail-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+}
+
+.detail-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 8px 0;
+}
+
+.detail-row.coin-row .detail-value {
+  color: #fbbf24;
+}
+
+.detail-row.coin-row .detail-value.highlight {
+  color: #22c55e;
+}
+
+.detail-row.coin-row.total-row {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px dashed rgba(251, 191, 36, 0.3);
+}
+
+.detail-row.coin-row.total-row .detail-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.detail-row.coin-row.total-row .detail-value.total {
+  color: #f59e0b;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.detail-row.exp-row .detail-value {
+  color: #a78bfa;
+}
+
+.detail-value.badge-new {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.events-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.event-tag {
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.1));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.btn-toggle-detail {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-toggle-detail:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+.toggle-icon {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: 12px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-2px);
+}
+
+.qa-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.qa-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.quick-action-btn.continue-btn {
+  border-color: rgba(236, 72, 153, 0.3);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.12), rgba(244, 114, 182, 0.06));
+}
+
+.quick-action-btn.continue-btn:hover {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(244, 114, 182, 0.1));
+  border-color: rgba(236, 72, 153, 0.5);
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.25);
+}
+
+.quick-action-btn.continue-btn .qa-label {
+  color: #f472b6;
+}
+
+.quick-action-btn.atlas-btn {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(96, 165, 250, 0.06));
+}
+
+.quick-action-btn.atlas-btn:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(96, 165, 250, 0.1));
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
+}
+
+.quick-action-btn.atlas-btn .qa-label {
+  color: #60a5fa;
+}
+
+.quick-action-btn.detail-btn {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(74, 222, 128, 0.06));
+}
+
+.quick-action-btn.detail-btn:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(74, 222, 128, 0.1));
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.25);
+}
+
+.quick-action-btn.detail-btn .qa-label {
+  color: #4ade80;
 }
 </style>
